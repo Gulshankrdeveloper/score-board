@@ -44,7 +44,7 @@ type MatchRecord = {
 
 type CelebrationType = "4" | "6" | "W" | null;
 
-type GameState = "setup" | "toss" | "playing" | "history";
+type GameState = "setup" | "toss" | "playing" | "history" | "break";
 
 // --- Components ---
 const ActionButton = ({ onClick, label, color = "bg-blue-600", disabled = false }: { onClick: () => void; label: string | number | React.ReactNode; color?: string; disabled?: boolean }) => (
@@ -112,6 +112,12 @@ export default function CricketPage() {
     const [extras, setExtras] = useState({ w: 0, nb: 0, b: 0, lb: 0 });
     const [currentOver, setCurrentOver] = useState<string[]>([]);
     const [thisOverRuns, setThisOverRuns] = useState(0);
+
+    // New Match Config & State
+    const [totalOvers, setTotalOvers] = useState(5); // Default 5 overs
+    const [innings, setInnings] = useState<1 | 2>(1);
+    const [targetRuns, setTargetRuns] = useState<number | null>(null);
+    const [breakTimeLeft, setBreakTimeLeft] = useState(120); // 120 seconds = 2 mins
 
     // --- Selectors ---
     const currentBattingTeam = battingTeam === "A" ? teamA : teamB;
@@ -209,7 +215,39 @@ export default function CricketPage() {
         setBowlerId(null);
         setTeamA({ name: "Team A", players: [] });
         setTeamB({ name: "Team B", players: [] });
+        setInnings(1);
+        setTargetRuns(null);
     };
+
+    const startInningsBreak = () => {
+        setGameState("break");
+        setBreakTimeLeft(120);
+        setInnings(2);
+        setTargetRuns(totalRuns + 1);
+
+        // Reset necessary state for 2nd innings
+        setTotalRuns(0);
+        setTotalWickets(0);
+        setTotalBalls(0);
+        setExtras({ w: 0, nb: 0, b: 0, lb: 0 });
+        setCurrentOver([]);
+        setThisOverRuns(0);
+        setStrikerId(null);
+        setNonStrikerId(null);
+        setBowlerId(null);
+
+        // Swap Teams
+        setBattingTeam(battingTeam === "A" ? "B" : "A");
+    };
+
+    useEffect(() => {
+        if (gameState === "break" && breakTimeLeft > 0) {
+            const timer = setInterval(() => setBreakTimeLeft(prev => prev - 1), 1000);
+            return () => clearInterval(timer);
+        } else if (gameState === "break" && breakTimeLeft === 0) {
+            setGameState("playing");
+        }
+    }, [gameState, breakTimeLeft]);
 
     const deleteMatch = (id: string) => {
         const updatedHistory = matchHistory.filter(m => m.id !== id);
@@ -267,6 +305,7 @@ export default function CricketPage() {
         let isExtra = false;
         let isWicket = false;
         let isValidBall = true;
+        let shouldEndInnings = false;
 
         if (typeof runs === 'number') {
             runVal = runs;
@@ -282,10 +321,21 @@ export default function CricketPage() {
                 setTotalWickets(w => w + 1);
                 updateBatsmanScore(0); // Ball faced, 0 runs
                 updateBowlerStats(0, true, true);
-                // Delay showing batsman selection until animation is done
-                setTimeout(() => {
-                    setStrikerId(null);
-                }, 2500);
+
+                if (totalWickets + 1 >= 10) { // 10 wickets = All Out in 11 player team
+                    shouldEndInnings = true;
+                    if (innings === 1) {
+                        setTimeout(startInningsBreak, 2000);
+                    } else {
+                        // End Match logic here if needed, currently manual "End Match"
+                        alert("All Out! End of Match.");
+                    }
+                } else {
+                    // Delay showing batsman selection until animation is done
+                    setTimeout(() => {
+                        setStrikerId(null);
+                    }, 2500);
+                }
             } else if (runs === "WD" || runs === "NB") {
                 isExtra = true;
                 isValidBall = false;
@@ -304,8 +354,28 @@ export default function CricketPage() {
             setTotalBalls(nextTotalBalls);
             setCurrentOver(prev => [...prev, runs.toString()]);
 
-            if (nextTotalBalls % 6 === 0) {
+            const nextOvers = Math.floor(nextTotalBalls / 6);
+            const isOverComplete = nextTotalBalls % 6 === 0;
+
+            // Target Chased Check (Innings 2)
+            if (innings === 2 && targetRuns && (totalRuns + runVal) >= targetRuns) {
+                alert(`Match Won by ${currentBattingTeam.name}!`);
+                return;
+            }
+
+            if (isOverComplete && !shouldEndInnings) {
                 // End of over logic
+
+                // Check Max Overs
+                if (nextOvers >= totalOvers) {
+                    if (innings === 1) {
+                        setTimeout(startInningsBreak, 2000);
+                        return;
+                    } else {
+                        alert("Innings Complete! End of Match.");
+                        // Could auto end match here
+                    }
+                }
                 // 1. Swap if odd runs on last ball
                 if (typeof runs === 'number' && runs % 2 !== 0) {
                     swapStriker();
@@ -456,6 +526,27 @@ export default function CricketPage() {
                     </div>
                 </div>
 
+                {/* Match Settings */}
+                <div className="w-full max-w-4xl mt-8 bg-neutral-900/50 p-6 rounded-2xl border border-neutral-800">
+                    <h3 className="text-xl font-bold mb-4 text-neutral-300">Match Settings</h3>
+                    <div className="flex flex-col gap-2">
+                        <label className="text-neutral-400">Total Overs: <span className="text-blue-400 font-bold">{totalOvers}</span></label>
+                        <input
+                            type="range"
+                            min="1"
+                            max="20"
+                            value={totalOvers}
+                            onChange={(e) => setTotalOvers(parseInt(e.target.value))}
+                            className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                        />
+                        <div className="flex justify-between text-xs text-neutral-500 mt-1">
+                            <span>1 Over</span>
+                            <span>10 Overs</span>
+                            <span>20 Overs</span>
+                        </div>
+                    </div>
+                </div>
+
                 <div className="flex flex-col gap-4 items-center mt-8">
                     <button
                         onClick={startGame}
@@ -480,8 +571,9 @@ export default function CricketPage() {
     if (gameState === "history") {
         if (selectedMatch) {
             // Detailed Scorecard View
-            const battingTeam = selectedMatch.battingTeamName === selectedMatch.teamA.name ? selectedMatch.teamA : selectedMatch.teamB;
-            const bowlingTeam = selectedMatch.battingTeamName === selectedMatch.teamA.name ? selectedMatch.teamB : selectedMatch.teamA;
+            // Detailed Scorecard View
+            // No longer deriving 'battingTeam' and 'bowlingTeam' like before.
+            // We now display full stats for selectedMatch.teamA and selectedMatch.teamB
 
             return (
                 <div className="min-h-screen bg-neutral-950 text-white p-4 md:p-8 flex flex-col items-center max-w-4xl mx-auto">
@@ -516,71 +608,149 @@ export default function CricketPage() {
                         </div>
                     </div>
 
-                    {/* Batting Scorecard */}
-                    <div className="w-full mb-6">
-                        <h3 className="text-lg font-bold mb-3 text-blue-400 border-l-4 border-blue-500 pl-3">Batting: {selectedMatch.battingTeamName}</h3>
-                        <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
-                            <table className="w-full text-left text-sm">
-                                <thead className="bg-neutral-800 text-neutral-400">
-                                    <tr>
-                                        <th className="p-3">Batsman</th>
-                                        <th className="p-3 text-right">R</th>
-                                        <th className="p-3 text-right">B</th>
-                                        <th className="p-3 text-right hidden md:table-cell">4s</th>
-                                        <th className="p-3 text-right hidden md:table-cell">6s</th>
-                                        <th className="p-3 text-right">SR</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-neutral-800">
-                                    {battingTeam.players.filter(p => p.balls > 0 || p.out).map(p => (
-                                        <tr key={p.id} className="hover:bg-neutral-800/50">
-                                            <td className="p-3 font-medium">{p.name} {p.out ? <span className="text-red-400 text-xs ml-1">(out)</span> : <span className="text-green-400 text-xs ml-1">*</span>}</td>
-                                            <td className="p-3 text-right font-bold text-white">{p.runs}</td>
-                                            <td className="p-3 text-right text-neutral-400">{p.balls}</td>
-                                            <td className="p-3 text-right hidden md:table-cell text-neutral-500">{p.fours}</td>
-                                            <td className="p-3 text-right hidden md:table-cell text-neutral-500">{p.sixes}</td>
-                                            <td className="p-3 text-right text-neutral-500">{(p.balls > 0 ? (p.runs / p.balls * 100).toFixed(1) : "0.0")}</td>
+                    {/* Team A Stats */}
+                    <div className="w-full mb-8">
+                        <h2 className="text-xl font-bold mb-4 text-blue-400 border-b border-blue-500/30 pb-2">{selectedMatch.teamA.name}</h2>
+
+                        {/* Team A Batting */}
+                        <div className="mb-4">
+                            <h3 className="text-sm font-bold text-neutral-400 mb-2 uppercase tracking-wider">Batting</h3>
+                            <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-neutral-800 text-neutral-400">
+                                        <tr>
+                                            <th className="p-3">Batsman</th>
+                                            <th className="p-3 text-right">R</th>
+                                            <th className="p-3 text-right">B</th>
+                                            <th className="p-3 text-right hidden md:table-cell">4s</th>
+                                            <th className="p-3 text-right hidden md:table-cell">6s</th>
+                                            <th className="p-3 text-right">SR</th>
                                         </tr>
-                                    ))}
-                                    {battingTeam.players.every(p => p.balls === 0 && !p.out) && (
-                                        <tr><td colSpan={6} className="p-4 text-center text-neutral-500 italic">No batting stats recorded.</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-neutral-800">
+                                        {selectedMatch.teamA.players.filter(p => p.balls > 0 || p.out).map(p => (
+                                            <tr key={p.id} className="hover:bg-neutral-800/50">
+                                                <td className="p-3 font-medium">{p.name} {p.out ? <span className="text-red-400 text-xs ml-1">(out)</span> : <span className="text-green-400 text-xs ml-1">*</span>}</td>
+                                                <td className="p-3 text-right font-bold text-white">{p.runs}</td>
+                                                <td className="p-3 text-right text-neutral-400">{p.balls}</td>
+                                                <td className="p-3 text-right hidden md:table-cell text-neutral-500">{p.fours}</td>
+                                                <td className="p-3 text-right hidden md:table-cell text-neutral-500">{p.sixes}</td>
+                                                <td className="p-3 text-right text-neutral-500">{(p.balls > 0 ? (p.runs / p.balls * 100).toFixed(1) : "0.0")}</td>
+                                            </tr>
+                                        ))}
+                                        {selectedMatch.teamA.players.every(p => p.balls === 0 && !p.out) && (
+                                            <tr><td colSpan={6} className="p-4 text-center text-neutral-500 italic">No batting stats.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* Team A Bowling */}
+                        <div>
+                            <h3 className="text-sm font-bold text-neutral-400 mb-2 uppercase tracking-wider">Bowling</h3>
+                            <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-neutral-800 text-neutral-400">
+                                        <tr>
+                                            <th className="p-3">Bowler</th>
+                                            <th className="p-3 text-right">O</th>
+                                            <th className="p-3 text-right">M</th>
+                                            <th className="p-3 text-right">R</th>
+                                            <th className="p-3 text-right">W</th>
+                                            <th className="p-3 text-right">Econ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-neutral-800">
+                                        {selectedMatch.teamA.players.filter(p => p.bowling.overs > 0).map(p => (
+                                            <tr key={p.id} className="hover:bg-neutral-800/50">
+                                                <td className="p-3 font-medium">{p.name}</td>
+                                                <td className="p-3 text-right text-white">{p.bowling.overs.toFixed(1)}</td>
+                                                <td className="p-3 text-right text-neutral-500">{p.bowling.maidens}</td>
+                                                <td className="p-3 text-right text-neutral-400">{p.bowling.runs}</td>
+                                                <td className="p-3 text-right font-bold text-white">{p.bowling.wickets}</td>
+                                                <td className="p-3 text-right text-neutral-500">{(p.bowling.overs > 0 ? (p.bowling.runs / p.bowling.overs).toFixed(1) : "0.0")}</td>
+                                            </tr>
+                                        ))}
+                                        {selectedMatch.teamA.players.every(p => p.bowling.overs === 0) && (
+                                            <tr><td colSpan={6} className="p-4 text-center text-neutral-500 italic">No bowling stats.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Bowling Scorecard */}
+                    {/* Team B Stats */}
                     <div className="w-full">
-                        <h3 className="text-lg font-bold mb-3 text-green-400 border-l-4 border-green-500 pl-3">Bowling: {selectedMatch.bowlingTeamName}</h3>
-                        <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
-                            <table className="w-full text-left text-sm">
-                                <thead className="bg-neutral-800 text-neutral-400">
-                                    <tr>
-                                        <th className="p-3">Bowler</th>
-                                        <th className="p-3 text-right">O</th>
-                                        <th className="p-3 text-right">M</th>
-                                        <th className="p-3 text-right">R</th>
-                                        <th className="p-3 text-right">W</th>
-                                        <th className="p-3 text-right">Econ</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-neutral-800">
-                                    {bowlingTeam.players.filter(p => p.bowling.overs > 0).map(p => (
-                                        <tr key={p.id} className="hover:bg-neutral-800/50">
-                                            <td className="p-3 font-medium">{p.name}</td>
-                                            <td className="p-3 text-right text-white">{p.bowling.overs.toFixed(1)}</td>
-                                            <td className="p-3 text-right text-neutral-500">{p.bowling.maidens}</td>
-                                            <td className="p-3 text-right text-neutral-400">{p.bowling.runs}</td>
-                                            <td className="p-3 text-right font-bold text-white">{p.bowling.wickets}</td>
-                                            <td className="p-3 text-right text-neutral-500">{(p.bowling.overs > 0 ? (p.bowling.runs / p.bowling.overs).toFixed(1) : "0.0")}</td>
+                        <h2 className="text-xl font-bold mb-4 text-green-400 border-b border-green-500/30 pb-2">{selectedMatch.teamB.name}</h2>
+
+                        {/* Team B Batting */}
+                        <div className="mb-4">
+                            <h3 className="text-sm font-bold text-neutral-400 mb-2 uppercase tracking-wider">Batting</h3>
+                            <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-neutral-800 text-neutral-400">
+                                        <tr>
+                                            <th className="p-3">Batsman</th>
+                                            <th className="p-3 text-right">R</th>
+                                            <th className="p-3 text-right">B</th>
+                                            <th className="p-3 text-right hidden md:table-cell">4s</th>
+                                            <th className="p-3 text-right hidden md:table-cell">6s</th>
+                                            <th className="p-3 text-right">SR</th>
                                         </tr>
-                                    ))}
-                                    {bowlingTeam.players.every(p => p.bowling.overs === 0) && (
-                                        <tr><td colSpan={6} className="p-4 text-center text-neutral-500 italic">No bowling stats recorded.</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-neutral-800">
+                                        {selectedMatch.teamB.players.filter(p => p.balls > 0 || p.out).map(p => (
+                                            <tr key={p.id} className="hover:bg-neutral-800/50">
+                                                <td className="p-3 font-medium">{p.name} {p.out ? <span className="text-red-400 text-xs ml-1">(out)</span> : <span className="text-green-400 text-xs ml-1">*</span>}</td>
+                                                <td className="p-3 text-right font-bold text-white">{p.runs}</td>
+                                                <td className="p-3 text-right text-neutral-400">{p.balls}</td>
+                                                <td className="p-3 text-right hidden md:table-cell text-neutral-500">{p.fours}</td>
+                                                <td className="p-3 text-right hidden md:table-cell text-neutral-500">{p.sixes}</td>
+                                                <td className="p-3 text-right text-neutral-500">{(p.balls > 0 ? (p.runs / p.balls * 100).toFixed(1) : "0.0")}</td>
+                                            </tr>
+                                        ))}
+                                        {selectedMatch.teamB.players.every(p => p.balls === 0 && !p.out) && (
+                                            <tr><td colSpan={6} className="p-4 text-center text-neutral-500 italic">No batting stats.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* Team B Bowling */}
+                        <div>
+                            <h3 className="text-sm font-bold text-neutral-400 mb-2 uppercase tracking-wider">Bowling</h3>
+                            <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-neutral-800 text-neutral-400">
+                                        <tr>
+                                            <th className="p-3">Bowler</th>
+                                            <th className="p-3 text-right">O</th>
+                                            <th className="p-3 text-right">M</th>
+                                            <th className="p-3 text-right">R</th>
+                                            <th className="p-3 text-right">W</th>
+                                            <th className="p-3 text-right">Econ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-neutral-800">
+                                        {selectedMatch.teamB.players.filter(p => p.bowling.overs > 0).map(p => (
+                                            <tr key={p.id} className="hover:bg-neutral-800/50">
+                                                <td className="p-3 font-medium">{p.name}</td>
+                                                <td className="p-3 text-right text-white">{p.bowling.overs.toFixed(1)}</td>
+                                                <td className="p-3 text-right text-neutral-500">{p.bowling.maidens}</td>
+                                                <td className="p-3 text-right text-neutral-400">{p.bowling.runs}</td>
+                                                <td className="p-3 text-right font-bold text-white">{p.bowling.wickets}</td>
+                                                <td className="p-3 text-right text-neutral-500">{(p.bowling.overs > 0 ? (p.bowling.runs / p.bowling.overs).toFixed(1) : "0.0")}</td>
+                                            </tr>
+                                        ))}
+                                        {selectedMatch.teamB.players.every(p => p.bowling.overs === 0) && (
+                                            <tr><td colSpan={6} className="p-4 text-center text-neutral-500 italic">No bowling stats.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -665,6 +835,29 @@ export default function CricketPage() {
         );
     }
 
+    if (gameState === "break") {
+        return (
+            <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center p-4">
+                <div className="text-4xl font-bold text-yellow-400 mb-8 animate-pulse">Innings Break</div>
+                <div className="text-2xl mb-4">Target: <span className="font-bold text-white">{targetRuns}</span></div>
+
+                <div className="w-64 h-64 rounded-full border-4 border-blue-500 flex items-center justify-center mb-8 relative">
+                    <div className="text-6xl font-black font-mono">
+                        {Math.floor(breakTimeLeft / 60)}:{(breakTimeLeft % 60).toString().padStart(2, '0')}
+                    </div>
+                    <div className="absolute inset-0 rounded-full border-t-4 border-transparent border-t-blue-300 animate-spin" style={{ animationDuration: '2s' }}></div>
+                </div>
+
+                <button
+                    onClick={() => setGameState("playing")}
+                    className="px-8 py-3 bg-white text-black font-bold rounded-full hover:scale-105 transition-transform"
+                >
+                    Start 2nd Innings Now
+                </button>
+            </div>
+        );
+    }
+
     // --- Playing View ---
     return (
         <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-center">
@@ -674,7 +867,7 @@ export default function CricketPage() {
                     <ChevronLeft size={20} className="text-blue-500" /> &larr; SportsBoard
                 </Link>
                 <div className="text-sm font-mono text-neutral-400">
-                    {currentBattingTeam.name} Batting
+                    {currentBattingTeam.name} Batting {innings === 2 && targetRuns && <span className="text-yellow-400 ml-2">(Target: {targetRuns})</span>}
                 </div>
                 <div className="flex gap-2">
                     <button onClick={saveMatch} className="px-3 py-1 bg-red-600/20 hover:bg-red-600 border border-red-500/50 text-red-200 hover:text-white rounded-lg text-xs font-bold transition-all">
