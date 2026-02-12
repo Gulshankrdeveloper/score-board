@@ -42,9 +42,33 @@ type MatchRecord = {
     extras: { w: number; nb: number; b: number; lb: number };
 };
 
+type TournamentTeam = {
+    id: string;
+    name: string;
+    played: number;
+    won: number;
+    lost: number;
+    points: number;
+    nrr: number; // Net Run Rate (simplified or full)
+    runsScored: number;
+    oversFaced: number;
+    runsConceded: number;
+    oversBowled: number;
+};
+
+type TournamentMatch = {
+    id: string;
+    teamAId: string;
+    teamBId: string;
+    winnerId: string | null;
+    completed: boolean;
+    result: string;
+    matchDate: string;
+};
+
 type CelebrationType = "4" | "6" | "W" | null;
 
-type GameState = "setup" | "toss" | "playing" | "history" | "break";
+type GameState = "setup" | "toss" | "playing" | "history" | "break" | "tournament-setup" | "tournament-dashboard";
 
 // --- Components ---
 const ActionButton = ({ onClick, label, color = "bg-blue-600", disabled = false }: { onClick: () => void; label: string | number | React.ReactNode; color?: string; disabled?: boolean }) => (
@@ -74,6 +98,13 @@ export default function CricketPage() {
     // Celebration State
     const [celebration, setCelebration] = useState<CelebrationType>(null);
 
+    // --- Tournament State ---
+    const [tournamentTeams, setTournamentTeams] = useState<TournamentTeam[]>([]);
+    const [tournamentMatches, setTournamentMatches] = useState<TournamentMatch[]>([]);
+    const [activeTournamentMatchId, setActiveTournamentMatchId] = useState<string | null>(null);
+    const [tournamentName, setTournamentName] = useState("My Tournament");
+    const [tempTournamentTeamName, setTempTournamentTeamName] = useState("");
+
     useEffect(() => {
         if (celebration) {
             const timer = setTimeout(() => setCelebration(null), 2500);
@@ -81,13 +112,37 @@ export default function CricketPage() {
         }
     }, [celebration]);
 
-    // Load history on mount
-    useState(() => {
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('cricket_history');
-            if (saved) setMatchHistory(JSON.parse(saved));
+    // --- Persistence ---
+    useEffect(() => {
+        const savedHistory = localStorage.getItem('cricket_history');
+        if (savedHistory) setMatchHistory(JSON.parse(savedHistory));
+
+        const savedTournTeams = localStorage.getItem('cricket_tournament_teams');
+        if (savedTournTeams) setTournamentTeams(JSON.parse(savedTournTeams));
+
+        const savedTournMatches = localStorage.getItem('cricket_tournament_matches');
+        if (savedTournMatches) setTournamentMatches(JSON.parse(savedTournMatches));
+
+        // Restore active match if any
+        const savedActiveMatchId = localStorage.getItem('cricket_active_tournament_match');
+        if (savedActiveMatchId) setActiveTournamentMatchId(savedActiveMatchId);
+    }, []);
+
+    useEffect(() => {
+        localStorage.setItem('cricket_tournament_teams', JSON.stringify(tournamentTeams));
+    }, [tournamentTeams]);
+
+    useEffect(() => {
+        localStorage.setItem('cricket_tournament_matches', JSON.stringify(tournamentMatches));
+    }, [tournamentMatches]);
+
+    useEffect(() => {
+        if (activeTournamentMatchId) {
+            localStorage.setItem('cricket_active_tournament_match', activeTournamentMatchId);
+        } else {
+            localStorage.removeItem('cricket_active_tournament_match');
         }
-    });
+    }, [activeTournamentMatchId]);
 
     // --- Team Initial Setup State ---
     const [teamAName, setTeamAName] = useState("Team A");
@@ -118,6 +173,8 @@ export default function CricketPage() {
     const [innings, setInnings] = useState<1 | 2>(1);
     const [targetRuns, setTargetRuns] = useState<number | null>(null);
     const [breakTimeLeft, setBreakTimeLeft] = useState(120); // 120 seconds = 2 mins
+
+
 
     // --- Selectors ---
     const currentBattingTeam = battingTeam === "A" ? teamA : teamB;
@@ -184,6 +241,77 @@ export default function CricketPage() {
         setGameState("playing");
     };
 
+    const addTournamentTeam = () => {
+        if (!tempTournamentTeamName.trim()) return;
+        const newTeam: TournamentTeam = {
+            id: Math.random().toString(36).substr(2, 9),
+            name: tempTournamentTeamName.trim(),
+            played: 0, won: 0, lost: 0, points: 0, nrr: 0,
+            runsScored: 0, oversFaced: 0, runsConceded: 0, oversBowled: 0
+        };
+        setTournamentTeams([...tournamentTeams, newTeam]);
+        setTempTournamentTeamName("");
+    };
+
+    const removeTournamentTeam = (id: string) => {
+        setTournamentTeams(tournamentTeams.filter(t => t.id !== id));
+    };
+
+    const generateSchedule = () => {
+        if (tournamentTeams.length < 2) {
+            alert("Need at least 2 teams to generate a schedule.");
+            return;
+        }
+        const matches: TournamentMatch[] = [];
+        // Simple Round Robin
+        for (let i = 0; i < tournamentTeams.length; i++) {
+            for (let j = i + 1; j < tournamentTeams.length; j++) {
+                matches.push({
+                    id: Math.random().toString(36).substr(2, 9),
+                    teamAId: tournamentTeams[i].id,
+                    teamBId: tournamentTeams[j].id,
+                    winnerId: null,
+                    completed: false,
+                    result: "",
+                    matchDate: "Scheduled"
+                });
+            }
+        }
+        setTournamentMatches(matches);
+        setGameState("tournament-dashboard");
+    };
+
+    const startTournamentMatch = (matchId: string) => {
+        const match = tournamentMatches.find(m => m.id === matchId);
+        if (!match) return;
+
+        const teamAData = tournamentTeams.find(t => t.id === match.teamAId);
+        const teamBData = tournamentTeams.find(t => t.id === match.teamBId);
+
+        if (!teamAData || !teamBData) return;
+
+        // Reset Game State for new match
+        setTeamA({ name: teamAData.name, players: [] });
+        setTeamB({ name: teamBData.name, players: [] });
+        setTotalRuns(0);
+        setTotalWickets(0);
+        setTotalBalls(0);
+        setExtras({ w: 0, nb: 0, b: 0, lb: 0 });
+        setCurrentOver([]);
+        setThisOverRuns(0);
+        setStrikerId(null);
+        setNonStrikerId(null);
+        setBowlerId(null);
+        setInnings(1);
+        setTargetRuns(null);
+        setActiveTournamentMatchId(matchId);
+
+        // Auto fill players for smoother tournament flow (optional, but good for UX)
+        // Or user adds them manually. Let's force manual or provide quick fill button in setup.
+        // Go to Setup
+        setGameState("setup");
+    };
+
     const saveMatch = () => {
         const newRecord: MatchRecord = {
             id: Date.now().toString(),
@@ -201,6 +329,76 @@ export default function CricketPage() {
         const updatedHistory = [newRecord, ...matchHistory];
         setMatchHistory(updatedHistory);
         localStorage.setItem('cricket_history', JSON.stringify(updatedHistory));
+
+        if (activeTournamentMatchId) {
+            const matchIndex = tournamentMatches.findIndex(m => m.id === activeTournamentMatchId);
+            if (matchIndex >= 0) {
+                const updatedMatches = [...tournamentMatches];
+                const match = updatedMatches[matchIndex];
+                match.completed = true;
+                match.result = `${currentBattingTeam.name} won`; // Simplified result text
+                match.winnerId = currentBattingTeam.name === teamA.name ? match.teamAId : match.teamBId; // Verify logic: currentBattingTeam is winner?
+                // Wait, logic check:
+                // If innings 2 chased target -> Batting Team Wins.
+                // If innings 2 fails -> Bowling Team Wins.
+                // If innings 1 ends and we manual save?
+                // Let's rely on whoever is "currentBattingTeam" winning? No.
+                // We need a proper Winner determination logic in saveMatch.
+                // For now, let's assume the user clicks "End Match" when it's done. 
+                // If it's a chase win, batting team wins.
+                // If it's a defend win, bowling team wins.
+                // Simplified: Ask user who won? Or detect score.
+
+                let winnerId = null;
+                const batRuns = totalRuns;
+                const bowlRuns = innings === 2 ? (targetRuns ? targetRuns - 1 : 0) : 0; // Rough logic
+
+                // Better: Pass "winningTeam" to saveMatch?
+                // Let's do simple logic: If target chased -> Batting wins. Else Bowling wins.
+                if (innings === 2 && targetRuns && totalRuns >= targetRuns) {
+                    winnerId = currentBattingTeam.name === teamA.name ? match.teamAId : match.teamBId;
+                } else if (innings === 2) { // Defended
+                    winnerId = currentBowlingTeam.name === teamA.name ? match.teamAId : match.teamBId;
+                } else {
+                    // Innings 1 end? Can't really determine winner unless D/L or forfeit.
+                    // Assuming simple flow: Only save completed match.
+                    // Determine winner based on scores if innings 1 and 2 done?
+                    // Complexity: This `saveMatch` is called manually.
+                    // Let's assume the USER ensures the match is over.
+                    // We will assume current Batting team WON if they have more runs than target.
+                    // Otherwise Bowling team won.
+                    if (targetRuns && totalRuns >= targetRuns) {
+                        winnerId = currentBattingTeam.name === teamA.name ? match.teamAId : match.teamBId;
+                    } else {
+                        winnerId = currentBowlingTeam.name === teamA.name ? match.teamAId : match.teamBId;
+                    }
+                }
+
+                match.winnerId = winnerId;
+                match.result = winnerId === match.teamAId ? `${teamA.name} Won` : `${teamB.name} Won`;
+                setTournamentMatches(updatedMatches);
+
+                // Update Stats
+                const updatedTeams = tournamentTeams.map(t => {
+                    if (t.id === match.teamAId || t.id === match.teamBId) {
+                        const isWinner = t.id === winnerId;
+                        return {
+                            ...t,
+                            played: t.played + 1,
+                            won: t.won + (isWinner ? 1 : 0),
+                            lost: t.lost + (isWinner ? 0 : 1),
+                            points: t.points + (isWinner ? 2 : 0)
+                            // NRR logic omitted for brevity in this step
+                        };
+                    }
+                    return t;
+                });
+                setTournamentTeams(updatedTeams);
+                setActiveTournamentMatchId(null);
+                setGameState("tournament-dashboard");
+                return; // Exit, don't go to setup
+            }
+        }
 
         // Reset and go to setup
         setGameState("setup");
@@ -487,6 +685,11 @@ export default function CricketPage() {
                             />
                             <button onClick={() => addPlayer("A", tempPlayerNameA)} className="bg-blue-600 p-2 rounded-lg"><UserPlus size={20} /></button>
                         </div>
+                        <div className="md:hidden mb-4">
+                            <button onClick={() => setGameState("tournament-setup")} className="w-full py-2 bg-gradient-to-r from-yellow-600 to-orange-600 rounded-lg font-bold text-sm">
+                                🏆 Tournament Mode
+                            </button>
+                        </div>
                         <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
                             {teamA.players.map(p => (
                                 <div key={p.id} className="bg-neutral-800/50 p-3 rounded-lg flex justify-between items-center">
@@ -527,7 +730,12 @@ export default function CricketPage() {
                 </div>
 
                 {/* Match Settings */}
-                <div className="w-full max-w-4xl mt-8 bg-neutral-900/50 p-6 rounded-2xl border border-neutral-800">
+                <div className="w-full max-w-4xl mt-8 bg-neutral-900/50 p-6 rounded-2xl border border-neutral-800 relative">
+                    {activeTournamentMatchId && (
+                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-yellow-600 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg">
+                            Tournament Match
+                        </div>
+                    )}
                     <h3 className="text-xl font-bold mb-4 text-neutral-300">Match Settings</h3>
                     <div className="flex flex-col gap-2">
                         <label className="text-neutral-400">Total Overs: <span className="text-blue-400 font-bold">{totalOvers}</span></label>
@@ -563,10 +771,137 @@ export default function CricketPage() {
                             Quick Fill Teams (Dev)
                         </button>
                     )}
+                    {!activeTournamentMatchId && (
+                        <button onClick={() => setGameState("tournament-setup")} className="text-sm text-yellow-500 hover:text-yellow-400 font-bold flex items-center gap-2 mt-4 border border-yellow-500/30 px-4 py-2 rounded-full hover:bg-yellow-500/10 transition-colors">
+                            🏆 Switch to Tournament Mode
+                        </button>
+                    )}
                 </div>
             </div>
         );
     }
+
+    if (gameState === "tournament-setup") {
+        return (
+            <div className="min-h-screen bg-neutral-950 text-white p-4 md:p-8 flex flex-col items-center max-w-4xl mx-auto">
+                <div className="w-full flex justify-between items-center mb-8 border-b border-neutral-800 pb-4">
+                    <button onClick={() => setGameState("setup")} className="text-neutral-400 hover:text-white">&larr; Back</button>
+                    <h1 className="text-2xl font-bold text-yellow-500">Tournament Setup</h1>
+                    <div className="w-10"></div>
+                </div>
+
+                <div className="w-full bg-neutral-900/50 p-6 rounded-2xl border border-neutral-800 mb-8">
+                    <h3 className="text-lg font-bold mb-4">Add Teams</h3>
+                    <div className="flex gap-2 mb-4">
+                        <input
+                            className="flex-1 bg-neutral-800 rounded-lg px-4 py-2 outline-none"
+                            placeholder="Team Name (e.g. Mumbai Indians)"
+                            value={tempTournamentTeamName}
+                            onChange={(e) => setTempTournamentTeamName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && addTournamentTeam()}
+                        />
+                        <button onClick={addTournamentTeam} className="bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500">Add</button>
+                    </div>
+
+                    <div className="space-y-2">
+                        {tournamentTeams.map(t => (
+                            <div key={t.id} className="bg-neutral-800 p-3 rounded-lg flex justify-between items-center">
+                                <span className="font-bold">{t.name}</span>
+                                <button onClick={() => removeTournamentTeam(t.id)} className="text-red-400 hover:text-red-300"><Trash2 size={18} /></button>
+                            </div>
+                        ))}
+                        {tournamentTeams.length === 0 && <p className="text-neutral-500 text-center italic py-4">No teams added yet.</p>}
+                    </div>
+                </div>
+
+                <button
+                    onClick={generateSchedule}
+                    disabled={tournamentTeams.length < 2}
+                    className="w-full py-4 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl font-bold text-xl disabled:opacity-50 hover:scale-[1.02] transition-transform"
+                >
+                    Generate Schedule & Start
+                </button>
+            </div>
+        );
+    }
+
+    if (gameState === "tournament-dashboard") {
+        return (
+            <div className="min-h-screen bg-neutral-950 text-white p-4 md:p-8 flex flex-col items-center max-w-5xl mx-auto">
+                <div className="w-full flex justify-between items-center mb-8 border-b border-neutral-800 pb-4">
+                    <button onClick={() => setGameState("setup")} className="text-neutral-400 hover:text-white">&larr; Exit</button>
+                    <h1 className="text-2xl font-bold text-yellow-500">Tournament Dashboard</h1>
+                    <div className="w-10"></div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-8 w-full">
+                    {/* Points Table */}
+                    <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6">
+                        <h3 className="text-lg font-bold mb-4 text-blue-400">Points Table</h3>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-neutral-800 text-neutral-400">
+                                    <tr>
+                                        <th className="p-2">Team</th>
+                                        <th className="p-2 text-center">P</th>
+                                        <th className="p-2 text-center">W</th>
+                                        <th className="p-2 text-center">L</th>
+                                        <th className="p-2 text-center font-bold text-white">Pts</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-neutral-800">
+                                    {[...tournamentTeams].sort((a, b) => b.points - a.points).map((t, i) => (
+                                        <tr key={t.id} className="hover:bg-neutral-800/30">
+                                            <td className="p-2 font-medium flex items-center gap-2">
+                                                <span className="text-neutral-500 w-4">{i + 1}.</span> {t.name}
+                                            </td>
+                                            <td className="p-2 text-center text-neutral-400">{t.played}</td>
+                                            <td className="p-2 text-center text-green-400">{t.won}</td>
+                                            <td className="p-2 text-center text-red-400">{t.lost}</td>
+                                            <td className="p-2 text-center font-bold text-yellow-400">{t.points}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Schedule */}
+                    <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6">
+                        <h3 className="text-lg font-bold mb-4 text-green-400">Match Schedule</h3>
+                        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                            {tournamentMatches.map((m, i) => {
+                                const teamA = tournamentTeams.find(t => t.id === m.teamAId);
+                                const teamB = tournamentTeams.find(t => t.id === m.teamBId);
+                                return (
+                                    <div key={m.id} className={`p-4 rounded-xl border ${m.completed ? 'bg-neutral-900 border-neutral-800 opacity-70' : 'bg-neutral-800 border-neutral-700'}`}>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-neutral-500 text-xs">Match {i + 1}</span>
+                                            {m.completed && <span className="text-xs font-bold text-green-500">Completed</span>}
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <div className="font-bold">{teamA?.name} <span className="text-neutral-500 font-normal">vs</span> {teamB?.name}</div>
+                                            {m.completed ? (
+                                                <div className="text-xs text-yellow-400 font-bold">{m.result}</div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => startTournamentMatch(m.id)}
+                                                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-full transition-colors"
+                                                >
+                                                    Play
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
 
     if (gameState === "history") {
         if (selectedMatch) {
