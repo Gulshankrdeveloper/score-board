@@ -6,6 +6,7 @@ import { Settings, RotateCcw, Monitor, UserPlus, Users, ArrowLeftRight, Play, Tr
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
+
 // --- Types ---
 type Player = {
     id: string;
@@ -105,6 +106,11 @@ export default function CricketPage() {
     const [tournamentName, setTournamentName] = useState("My Tournament");
     const [tempTournamentTeamName, setTempTournamentTeamName] = useState("");
 
+
+
+    // --- Sync Effect ---
+
+
     useEffect(() => {
         if (celebration) {
             const timer = setTimeout(() => setCelebration(null), 2500);
@@ -185,6 +191,7 @@ export default function CricketPage() {
     const bowler = currentBowlingTeam.players.find(p => p.id === bowlerId);
 
     const [lastOverBowlerId, setLastOverBowlerId] = useState<string | null>(null);
+
 
     // --- Logic Helpers ---
     const fillDummyTeams = () => {
@@ -500,7 +507,7 @@ export default function CricketPage() {
 
     const handleBall = (runs: number | string) => {
         let runVal = 0;
-        let isExtra = false;
+        // let isExtra = false; // Unused in this simplified logic, but kept for context if needed later
         let isWicket = false;
         let isValidBall = true;
         let shouldEndInnings = false;
@@ -535,7 +542,7 @@ export default function CricketPage() {
                     }, 2500);
                 }
             } else if (runs === "WD" || runs === "NB") {
-                isExtra = true;
+                // isExtra = true;
                 isValidBall = false;
                 runVal = 1;
                 setExtras(prev => ({ ...prev, [runs === "WD" ? "w" : "nb"]: prev[runs === "WD" ? "w" : "nb"] + 1 }));
@@ -589,15 +596,7 @@ export default function CricketPage() {
                     // 3. ALWAYS swap ends at end of over (regardless of last ball run)
                     // But wait, if we swapped above (odd run), doing it again here cancels it out?
                     // Rule: Run taken (odd) -> Swap. Then End of over -> Ends change (Swap).
-                    // So yes, multiple swaps can happen. 
-                    // Example: 1 run on last ball. 
-                    // - Batters run (Swap 1). 
-                    // - Over ends (Ends change -> Swap 2).
-                    // Result: Original striker is back at strike? 
-                    // No, "swapStriker" just swaps IDs. 
-                    // Scenarios:
-                    // 1 Run: Striker A -> B (Run). Over ends -> Ends change (B is at Non-Striker end, A at Striker).
-                    // So effectively, A faces next ball? Yes.
+                    // So effectively, original striker is back at strike? Yes.
                     // Calling swapStriker() twice effectively does nothing if synchronous, but logic says:
                     // Odd run logic happens NOW. Over end logic happens usually immediately or after.
                     // Let's just call it again.
@@ -612,9 +611,9 @@ export default function CricketPage() {
         } else {
             // Extra ball
             setCurrentOver(prev => [...prev, runs.toString()]);
-            if (typeof runs === 'number' && runs % 2 !== 0) { // e.g. NB + run? Simplified here runs is string for extras
-                // runs is string for WD/NB so this check fails safely
-            }
+            // if (typeof runs === 'number' && runs % 2 !== 0) { // e.g. NB + run? Simplified here runs is string for extras
+            // runs is string for WD/NB so this check fails safely
+            // }
         }
     };
 
@@ -753,7 +752,19 @@ export default function CricketPage() {
                             <span>20 Overs</span>
                         </div>
                     </div>
+
+                    {isAdmin && (
+                        <button onClick={fillDummyTeams} className="text-xs text-neutral-500 underline hover:text-white mt-4">
+                            Quick Fill Teams (Dev)
+                        </button>
+                    )}
                 </div>
+
+                {!activeTournamentMatchId && (
+                    <button onClick={() => setGameState("tournament-setup")} className="text-sm text-yellow-500 hover:text-yellow-400 font-bold flex items-center gap-2 mt-8 border border-yellow-500/30 px-4 py-2 rounded-full hover:bg-yellow-500/10 transition-colors">
+                        🏆 Switch to Tournament Mode
+                    </button>
+                )}
 
                 <div className="flex flex-col gap-4 items-center mt-8">
                     <button
@@ -765,16 +776,6 @@ export default function CricketPage() {
                     </button>
                     {(teamA.players.length !== 11 || teamB.players.length !== 11) && (
                         <div className="text-red-400 text-sm">Both teams must have exactly 11 players.</div>
-                    )}
-                    {isAdmin && (
-                        <button onClick={fillDummyTeams} className="text-xs text-neutral-500 underline hover:text-white">
-                            Quick Fill Teams (Dev)
-                        </button>
-                    )}
-                    {!activeTournamentMatchId && (
-                        <button onClick={() => setGameState("tournament-setup")} className="text-sm text-yellow-500 hover:text-yellow-400 font-bold flex items-center gap-2 mt-4 border border-yellow-500/30 px-4 py-2 rounded-full hover:bg-yellow-500/10 transition-colors">
-                            🏆 Switch to Tournament Mode
-                        </button>
                     )}
                 </div>
             </div>
