@@ -55,6 +55,7 @@ type TournamentTeam = {
     oversFaced: number;
     runsConceded: number;
     oversBowled: number;
+    group: string; // "A" or "B"
 };
 
 type TournamentMatch = {
@@ -105,6 +106,7 @@ export default function CricketPage() {
     const [activeTournamentMatchId, setActiveTournamentMatchId] = useState<string | null>(null);
     const [tournamentName, setTournamentName] = useState("My Tournament");
     const [tempTournamentTeamName, setTempTournamentTeamName] = useState("");
+    const [tempTournamentGroup, setTempTournamentGroup] = useState("A");
 
 
 
@@ -254,7 +256,8 @@ export default function CricketPage() {
             id: Math.random().toString(36).substr(2, 9),
             name: tempTournamentTeamName.trim(),
             played: 0, won: 0, lost: 0, points: 0, nrr: 0,
-            runsScored: 0, oversFaced: 0, runsConceded: 0, oversBowled: 0
+            runsScored: 0, oversFaced: 0, runsConceded: 0, oversBowled: 0,
+            group: tempTournamentGroup // Add group assignment
         };
         setTournamentTeams([...tournamentTeams, newTeam]);
         setTempTournamentTeamName("");
@@ -270,20 +273,33 @@ export default function CricketPage() {
             return;
         }
         const matches: TournamentMatch[] = [];
-        // Simple Round Robin
-        for (let i = 0; i < tournamentTeams.length; i++) {
-            for (let j = i + 1; j < tournamentTeams.length; j++) {
-                matches.push({
-                    id: Math.random().toString(36).substr(2, 9),
-                    teamAId: tournamentTeams[i].id,
-                    teamBId: tournamentTeams[j].id,
-                    winnerId: null,
-                    completed: false,
-                    result: "",
-                    matchDate: "Scheduled"
-                });
+
+        // Group teams by group
+        const groups: { [key: string]: TournamentTeam[] } = {};
+        tournamentTeams.forEach(t => {
+            const g = t.group || "A";
+            if (!groups[g]) groups[g] = [];
+            groups[g].push(t);
+        });
+
+        // Generate Per-Group Round Robin
+        Object.keys(groups).forEach(groupName => {
+            const groupTeams = groups[groupName];
+            for (let i = 0; i < groupTeams.length; i++) {
+                for (let j = i + 1; j < groupTeams.length; j++) {
+                    matches.push({
+                        id: Math.random().toString(36).substr(2, 9),
+                        teamAId: groupTeams[i].id,
+                        teamBId: groupTeams[j].id,
+                        winnerId: null,
+                        completed: false,
+                        result: "",
+                        matchDate: `Group ${groupName} Match`
+                    });
+                }
             }
-        }
+        });
+
         setTournamentMatches(matches);
         setGameState("tournament-dashboard");
     };
@@ -794,6 +810,14 @@ export default function CricketPage() {
                 <div className="w-full bg-neutral-900/50 p-6 rounded-2xl border border-neutral-800 mb-8">
                     <h3 className="text-lg font-bold mb-4">Add Teams</h3>
                     <div className="flex gap-2 mb-4">
+                        <select
+                            className="bg-neutral-800 rounded-lg px-4 py-2 outline-none font-bold"
+                            value={tempTournamentGroup}
+                            onChange={(e) => setTempTournamentGroup(e.target.value)}
+                        >
+                            <option value="A">Group A</option>
+                            <option value="B">Group B</option>
+                        </select>
                         <input
                             className="flex-1 bg-neutral-800 rounded-lg px-4 py-2 outline-none"
                             placeholder="Team Name (e.g. Mumbai Indians)"
@@ -807,7 +831,10 @@ export default function CricketPage() {
                     <div className="space-y-2">
                         {tournamentTeams.map(t => (
                             <div key={t.id} className="bg-neutral-800 p-3 rounded-lg flex justify-between items-center">
-                                <span className="font-bold">{t.name}</span>
+                                <div>
+                                    <span className="font-bold">{t.name}</span>
+                                    <span className="ml-2 text-xs bg-neutral-700 px-2 py-0.5 rounded text-neutral-300">Group {t.group}</span>
+                                </div>
                                 <button onClick={() => removeTournamentTeam(t.id)} className="text-red-400 hover:text-red-300"><Trash2 size={18} /></button>
                             </div>
                         ))}
@@ -837,34 +864,46 @@ export default function CricketPage() {
 
                 <div className="grid md:grid-cols-2 gap-8 w-full">
                     {/* Points Table */}
-                    <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6">
-                        <h3 className="text-lg font-bold mb-4 text-blue-400">Points Table</h3>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-neutral-800 text-neutral-400">
-                                    <tr>
-                                        <th className="p-2">Team</th>
-                                        <th className="p-2 text-center">P</th>
-                                        <th className="p-2 text-center">W</th>
-                                        <th className="p-2 text-center">L</th>
-                                        <th className="p-2 text-center font-bold text-white">Pts</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-neutral-800">
-                                    {[...tournamentTeams].sort((a, b) => b.points - a.points).map((t, i) => (
-                                        <tr key={t.id} className="hover:bg-neutral-800/30">
-                                            <td className="p-2 font-medium flex items-center gap-2">
-                                                <span className="text-neutral-500 w-4">{i + 1}.</span> {t.name}
-                                            </td>
-                                            <td className="p-2 text-center text-neutral-400">{t.played}</td>
-                                            <td className="p-2 text-center text-green-400">{t.won}</td>
-                                            <td className="p-2 text-center text-red-400">{t.lost}</td>
-                                            <td className="p-2 text-center font-bold text-yellow-400">{t.points}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                    {/* Points Table - Grouped */}
+                    <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 max-h-[500px] overflow-y-auto">
+                        <h3 className="text-lg font-bold mb-4 text-blue-400">Points Tables</h3>
+                        {Array.from(new Set(tournamentTeams.map(t => t.group || "A"))).sort().map(group => (
+                            <div key={group} className="mb-8 last:mb-0">
+                                <h4 className="text-md font-bold mb-2 text-yellow-500 bg-neutral-800 px-3 py-1 rounded inline-block">Group {group}</h4>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-neutral-800 text-neutral-400">
+                                            <tr>
+                                                <th className="p-2">Team</th>
+                                                <th className="p-2 text-center">P</th>
+                                                <th className="p-2 text-center">W</th>
+                                                <th className="p-2 text-center">L</th>
+                                                <th className="p-2 text-center font-bold text-white">Pts</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-neutral-800">
+                                            {tournamentTeams
+                                                .filter(t => (t.group || "A") === group)
+                                                .sort((a, b) => b.points - a.points)
+                                                .map((t, i) => (
+                                                    <tr key={t.id} className="hover:bg-neutral-800/30">
+                                                        <td className="p-2 font-medium flex items-center gap-2">
+                                                            <span className="text-neutral-500 w-4">{i + 1}.</span> {t.name}
+                                                        </td>
+                                                        <td className="p-2 text-center text-neutral-400">{t.played}</td>
+                                                        <td className="p-2 text-center text-green-400">{t.won}</td>
+                                                        <td className="p-2 text-center text-red-400">{t.lost}</td>
+                                                        <td className="p-2 text-center font-bold text-yellow-400">{t.points}</td>
+                                                    </tr>
+                                                ))}
+                                        </tbody>
+                                    </table>
+                                    {tournamentTeams.filter(t => (t.group || "A") === group).length === 0 && (
+                                        <div className="text-center text-neutral-500 italic py-2">No teams in this group.</div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
                     </div>
 
                     {/* Schedule */}
