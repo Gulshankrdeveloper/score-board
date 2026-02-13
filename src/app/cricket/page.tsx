@@ -817,6 +817,8 @@ export default function CricketPage() {
                         >
                             <option value="A">Group A</option>
                             <option value="B">Group B</option>
+                            <option value="C">Group C</option>
+                            <option value="D">Group D</option>
                         </select>
                         <input
                             className="flex-1 bg-neutral-800 rounded-lg px-4 py-2 outline-none"
