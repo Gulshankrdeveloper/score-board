@@ -68,6 +68,26 @@ type TournamentMatch = {
     matchDate: string;
 };
 
+type GameStateSnapshot = {
+    teamA: Team;
+    teamB: Team;
+    totalRuns: number;
+    totalWickets: number;
+    totalBalls: number;
+    extras: { w: number; nb: number; b: number; lb: number };
+    currentOver: string[];
+    thisOverRuns: number;
+    strikerId: string | null;
+    nonStrikerId: string | null;
+    bowlerId: string | null;
+    lastOverBowlerId: string | null;
+    battingTeam: "A" | "B";
+    innings: 1 | 2;
+    targetRuns: number | null;
+    tournamentTeams: TournamentTeam[];
+    matchHistory: MatchRecord[];
+};
+
 type CelebrationType = "4" | "6" | "W" | null;
 
 type GameState = "setup" | "toss" | "playing" | "history" | "break" | "tournament-setup" | "tournament-dashboard";
@@ -181,6 +201,9 @@ export default function CricketPage() {
     const [innings, setInnings] = useState<1 | 2>(1);
     const [targetRuns, setTargetRuns] = useState<number | null>(null);
     const [breakTimeLeft, setBreakTimeLeft] = useState(120); // 120 seconds = 2 mins
+
+    // Undo State
+    const [undoStack, setUndoStack] = useState<GameStateSnapshot[]>([]);
 
 
 
@@ -521,7 +544,56 @@ export default function CricketPage() {
         }));
     };
 
+    const saveState = () => {
+        const snapshot: GameStateSnapshot = {
+            teamA,
+            teamB,
+            totalRuns,
+            totalWickets,
+            totalBalls,
+            extras,
+            currentOver,
+            thisOverRuns,
+            strikerId,
+            nonStrikerId,
+            bowlerId,
+            lastOverBowlerId,
+            battingTeam,
+            innings,
+            targetRuns,
+            tournamentTeams,
+            matchHistory
+        };
+        setUndoStack(prev => [...prev, snapshot]);
+    };
+
+    const undoLastBall = () => {
+        if (undoStack.length === 0) return;
+        const previousState = undoStack[undoStack.length - 1];
+
+        setTeamA(previousState.teamA);
+        setTeamB(previousState.teamB);
+        setTotalRuns(previousState.totalRuns);
+        setTotalWickets(previousState.totalWickets);
+        setTotalBalls(previousState.totalBalls);
+        setExtras(previousState.extras);
+        setCurrentOver(previousState.currentOver);
+        setThisOverRuns(previousState.thisOverRuns);
+        setStrikerId(previousState.strikerId);
+        setNonStrikerId(previousState.nonStrikerId);
+        setBowlerId(previousState.bowlerId);
+        setLastOverBowlerId(previousState.lastOverBowlerId);
+        setBattingTeam(previousState.battingTeam);
+        setInnings(previousState.innings);
+        setTargetRuns(previousState.targetRuns);
+        setTournamentTeams(previousState.tournamentTeams);
+        setMatchHistory(previousState.matchHistory);
+
+        setUndoStack(prev => prev.slice(0, -1));
+    };
+
     const handleBall = (runs: number | string) => {
+        saveState(); // Save state before modifying
         let runVal = 0;
         // let isExtra = false; // Unused in this simplified logic, but kept for context if needed later
         let isWicket = false;
@@ -808,6 +880,14 @@ export default function CricketPage() {
                 </div>
 
                 <div className="w-full bg-neutral-900/50 p-6 rounded-2xl border border-neutral-800 mb-8">
+                    <h3 className="text-lg font-bold mb-4">Tournament Name</h3>
+                    <input
+                        className="w-full bg-neutral-800 rounded-lg px-4 py-2 outline-none text-xl font-bold text-yellow-500 mb-6 placeholder-neutral-600"
+                        value={tournamentName}
+                        onChange={(e) => setTournamentName(e.target.value)}
+                        placeholder="Enter Tournament Name"
+                    />
+
                     <h3 className="text-lg font-bold mb-4">Add Teams</h3>
                     <div className="flex gap-2 mb-4">
                         <select
@@ -860,7 +940,7 @@ export default function CricketPage() {
             <div className="min-h-screen bg-neutral-950 text-white p-4 md:p-8 flex flex-col items-center max-w-5xl mx-auto">
                 <div className="w-full flex justify-between items-center mb-8 border-b border-neutral-800 pb-4">
                     <button onClick={() => setGameState("setup")} className="text-neutral-400 hover:text-white">&larr; Exit</button>
-                    <h1 className="text-2xl font-bold text-yellow-500">Tournament Dashboard</h1>
+                    <h1 className="text-2xl font-bold text-yellow-500">{tournamentName} Dashboard</h1>
                     <div className="w-10"></div>
                 </div>
 
@@ -1410,6 +1490,15 @@ export default function CricketPage() {
                 {/* Controls */}
                 {isAdmin && (
                     <div className="grid grid-cols-4 gap-3">
+                        <div className="col-span-4 flex justify-end mb-2">
+                            <button
+                                onClick={undoLastBall}
+                                disabled={undoStack.length === 0}
+                                className="flex items-center gap-2 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-sm text-neutral-400 hover:text-white transition-colors"
+                            >
+                                <RotateCcw size={16} /> Undo Last Ball
+                            </button>
+                        </div>
                         <ActionButton label="0" onClick={() => handleBall(0)} color="bg-neutral-800 text-neutral-400" disabled={!strikerId || !bowlerId} />
                         <ActionButton label="1" onClick={() => handleBall(1)} disabled={!strikerId || !bowlerId} />
                         <ActionButton label="2" onClick={() => handleBall(2)} disabled={!strikerId || !bowlerId} />
