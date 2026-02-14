@@ -499,6 +499,15 @@ export default function CricketPage() {
         localStorage.setItem('cricket_history', JSON.stringify(updatedHistory));
     };
 
+    const markStrikerOut = () => {
+        if (!strikerId) return;
+        const teamSetter = battingTeam === "A" ? setTeamA : setTeamB;
+        teamSetter(prev => ({
+            ...prev,
+            players: prev.players.map(p => p.id === strikerId ? { ...p, out: true } : p)
+        }));
+    };
+
     const updateBatsmanScore = (runs: number) => {
         if (!strikerId) return;
         const teamSetter = battingTeam === "A" ? setTeamA : setTeamB;
@@ -510,7 +519,7 @@ export default function CricketPage() {
                     return {
                         ...p,
                         runs: p.runs + runs,
-                        balls: p.balls + 1, // Start logic: wide/nb doesn't add ball to batsman usually, but simple game here
+                        balls: p.balls + 1,
                         fours: runs === 4 ? p.fours + 1 : p.fours,
                         sixes: runs === 6 ? p.sixes + 1 : p.sixes
                     };
@@ -522,20 +531,19 @@ export default function CricketPage() {
 
     const updateBowlerStats = (runsConceded: number, isWicket: boolean, isValidBall: boolean) => {
         if (!bowlerId) return;
-        const teamSetter = battingTeam === "A" ? setTeamB : setTeamA; // Bowling team is opposite
+        const teamSetter = battingTeam === "A" ? setTeamB : setTeamA;
 
         teamSetter(prev => ({
             ...prev,
             players: prev.players.map(p => {
                 if (p.id === bowlerId) {
-                    // Simplified: Just add runs/wickets.
                     return {
                         ...p,
                         bowling: {
                             ...p.bowling,
                             runs: p.bowling.runs + runsConceded,
                             wickets: isWicket ? p.bowling.wickets + 1 : p.bowling.wickets,
-                            overs: isValidBall && (p.bowling.overs * 6 + 1) % 6 === 0 ? p.bowling.overs + 1 : p.bowling.overs + (isValidBall ? 0.1 : 0) // rough approx for display
+                            overs: isValidBall && (p.bowling.overs * 6 + 1) % 6 === 0 ? p.bowling.overs + 1 : p.bowling.overs + (isValidBall ? 0.1 : 0)
                         }
                     };
                 }
@@ -613,6 +621,7 @@ export default function CricketPage() {
                 setCelebration("W");
                 setTotalWickets(w => w + 1);
                 updateBatsmanScore(0); // Ball faced, 0 runs
+                markStrikerOut();
                 updateBowlerStats(0, true, true);
 
                 if (totalWickets + 1 >= 10) { // 10 wickets = All Out in 11 player team
@@ -1491,6 +1500,47 @@ export default function CricketPage() {
                             </motion.div>
                         ))}
                     </AnimatePresence>
+                </div>
+
+                {/* Persistent Stats (Mini Scorecard) */}
+                <div className="flex-1 min-h-0 overflow-hidden bg-neutral-900/30 rounded-xl p-2 border border-neutral-800/50 my-1">
+                    <div className="grid grid-cols-2 gap-2 h-full">
+                        {/* Batting Stats */}
+                        <div className="overflow-y-auto pr-1 no-scrollbar">
+                            <div className="text-[10px] uppercase text-neutral-500 font-bold mb-1 sticky top-0 bg-neutral-950/80 backdrop-blur-sm py-1 z-10">Batting</div>
+                            <div className="space-y-1">
+                                {currentBattingTeam.players
+                                    .filter(p => p.runs > 0 || p.balls > 0 || p.out || p.id === strikerId || p.id === nonStrikerId)
+                                    .map(p => (
+                                        <div key={p.id} className={cn("text-xs flex justify-between items-center p-1 rounded", p.out ? "text-red-400 bg-red-900/10" : "text-neutral-300")}>
+                                            <div className="flex items-center gap-1">
+                                                <span className="truncate max-w-[80px]">{p.name}</span>
+                                                {p.id === strikerId && <span className="text-blue-400">*</span>}
+                                                {p.out && <span className="text-[10px] text-red-500 opacity-70">(out)</span>}
+                                            </div>
+                                            <div className="font-mono">{p.runs} <span className="text-[10px] opacity-50">({p.balls})</span></div>
+                                        </div>
+                                    ))}
+                            </div>
+                        </div>
+
+                        {/* Bowling Stats */}
+                        <div className="overflow-y-auto pl-1 border-l border-neutral-800 no-scrollbar">
+                            <div className="text-[10px] uppercase text-neutral-500 font-bold mb-1 sticky top-0 bg-neutral-950/80 backdrop-blur-sm py-1 z-10">Bowling</div>
+                            <div className="space-y-1">
+                                {currentBowlingTeam.players
+                                    .filter(p => p.bowling.overs > 0 || p.id === bowlerId)
+                                    .map(p => (
+                                        <div key={p.id} className={cn("text-xs flex justify-between items-center p-1 rounded", p.id === bowlerId ? "bg-neutral-800 text-white" : "text-neutral-400")}>
+                                            <span className="truncate max-w-[60px]">{p.name}</span>
+                                            <div className="font-mono text-[10px]">
+                                                {p.bowling.wickets}-{p.bowling.runs} <span className="opacity-50">({(p.bowling.overs).toFixed(1)})</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Controls - Compact */}
