@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -91,6 +91,8 @@ type GameStateSnapshot = {
 type CelebrationType = "4" | "6" | "W" | null;
 
 type GameState = "setup" | "toss" | "playing" | "history" | "break" | "tournament-setup" | "tournament-dashboard";
+type UserRole = "scorer" | "viewer" | null;
+type ViewMode = "dashboard" | "match";
 
 // --- Components ---
 const ActionButton = ({ onClick, label, color = "bg-blue-600", disabled = false }: { onClick: () => void; label: string | number | React.ReactNode; color?: string; disabled?: boolean }) => (
@@ -111,6 +113,21 @@ const ActionButton = ({ onClick, label, color = "bg-blue-600", disabled = false 
 export default function CricketPage() {
     // --- Game Config State ---
     const [gameState, setGameState] = useState<GameState>("setup");
+
+    // --- Role & Flow State ---
+    const [userRole, setUserRole] = useState<UserRole>(null);
+    const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
+
+    const handleRoleSelect = (role: UserRole) => {
+        setUserRole(role);
+        if (role === 'scorer') {
+            setIsAdmin(true);
+            setViewMode('match');
+        } else {
+            setIsAdmin(false);
+            setViewMode('dashboard');
+        }
+    };
 
 
     // History State
@@ -750,6 +767,118 @@ export default function CricketPage() {
 
     // --- Render ---
 
+    // --- Role Selection View ---
+    if (!userRole) {
+        return (
+            <div className="h-dvh bg-neutral-950 text-white flex flex-col items-center justify-center p-6 gap-6">
+                <div className="text-center space-y-2 mb-8">
+                    <h1 className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-600">SportsBoard</h1>
+                    <p className="text-neutral-400">Select your role to continue</p>
+                </div>
+
+                <div className="grid gap-4 w-full max-w-md">
+                    <button
+                        onClick={() => handleRoleSelect('viewer')}
+                        className="bg-neutral-900 border border-neutral-800 p-6 rounded-2xl flex items-center gap-4 hover:bg-neutral-800 hover:border-blue-500/50 transition-all group text-left"
+                    >
+                        <div className="w-12 h-12 rounded-full bg-blue-900/20 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Users size={24} />
+                        </div>
+                        <div>
+                            <div className="font-bold text-lg text-white">I am a Viewer</div>
+                            <div className="text-sm text-neutral-500">Check live scores, upcoming matches, and results.</div>
+                        </div>
+                    </button>
+
+                    <button
+                        onClick={() => handleRoleSelect('scorer')}
+                        className="bg-neutral-900 border border-neutral-800 p-6 rounded-2xl flex items-center gap-4 hover:bg-neutral-800 hover:border-green-500/50 transition-all group text-left"
+                    >
+                        <div className="w-12 h-12 rounded-full bg-green-900/20 text-green-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Settings size={24} />
+                        </div>
+                        <div>
+                            <div className="font-bold text-lg text-white">I am a Scorer</div>
+                            <div className="text-sm text-neutral-500">Manage matches, update scores, and control the game.</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    // --- Viewer Dashboard View ---
+    if (userRole === 'viewer' && viewMode === 'dashboard') {
+        return (
+            <div className="h-dvh bg-neutral-950 text-white flex flex-col">
+                <div className="p-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/50 backdrop-blur-md sticky top-0 z-10">
+                    <div className="font-bold text-xl">Dashboard</div>
+                    <button onClick={() => setUserRole(null)} className="text-xs text-neutral-500 hover:text-white">Switch Role</button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                    {/* Live Section */}
+                    {gameState !== 'setup' && (
+                        <section>
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                                <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider">Live Now</h2>
+                            </div>
+                            <div
+                                onClick={() => setViewMode('match')}
+                                className="bg-gradient-to-br from-neutral-900 to-neutral-950 border border-neutral-800 rounded-xl p-4 active:scale-95 transition-transform cursor-pointer hover:border-blue-500/30"
+                            >
+                                <div className="flex justify-between items-start mb-4">
+                                    <span className="bg-red-600/20 text-red-500 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-500/20">LIVE</span>
+                                    <span className="text-xs text-neutral-500">T20 Match</span>
+                                </div>
+                                <div className="flex justify-between items-center mb-2">
+                                    <div className="font-bold text-lg">{currentBattingTeam.name}</div>
+                                    <div className="text-2xl font-black">{totalRuns}/{totalWickets}</div>
+                                </div>
+                                <div className="text-xs text-neutral-400">
+                                    {overs}.{ballsInOver} Overs • Target: {targetRuns || '-'}
+                                </div>
+                            </div>
+                        </section>
+                    )}
+
+                    {/* Upcoming Section (Dummy) */}
+                    <section>
+                        <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-3">Upcoming</h2>
+                        <div className="bg-neutral-900/50 border border-neutral-800/50 rounded-xl p-4 opacity-75">
+                            <div className="flex justify-between text-sm mb-1">
+                                <span className="font-bold text-white">India vs Pakistan</span>
+                                <span className="text-blue-400">Tomorrow</span>
+                            </div>
+                            <div className="text-xs text-neutral-500">Champions Trophy • 2:00 PM</div>
+                        </div>
+                    </section>
+
+                    {/* Recent Matches */}
+                    <section>
+                        <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-3">Recent Results</h2>
+                        <div className="space-y-2">
+                            {matchHistory.length === 0 ? (
+                                <div className="text-xs text-neutral-600 italic">No completed matches yet.</div>
+                            ) : (
+                                matchHistory.map(m => (
+                                    <div key={m.id} className="bg-neutral-900 border border-neutral-800 rounded-xl p-3 flex justify-between items-center">
+                                        <div>
+                                            <div className="text-sm font-bold text-white">{m.teamA.name} vs {m.teamB.name}</div>
+                                            <div className="text-xs text-neutral-500">{m.date} • {m.result}</div>
+                                        </div>
+                                        {/* For simplicity in this non-db version, we don't load old stats fully yet, just show record */}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </section>
+                </div>
+            </div>
+        );
+    }
+
     if (gameState === "setup") {
         return (
             <div className="min-h-screen bg-neutral-950 text-white p-4 md:p-8 flex flex-col items-center max-w-4xl mx-auto">
@@ -786,7 +915,7 @@ export default function CricketPage() {
                         </div>
                         <div className="md:hidden mb-4">
                             <button onClick={() => setGameState("tournament-setup")} className="w-full py-2 bg-gradient-to-r from-yellow-600 to-orange-600 rounded-lg font-bold text-sm">
-                                🏆 Tournament Mode
+                                ðŸ† Tournament Mode
                             </button>
                         </div>
                         <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
@@ -862,7 +991,7 @@ export default function CricketPage() {
 
                 {!activeTournamentMatchId && (
                     <button onClick={() => setGameState("tournament-setup")} className="text-sm text-yellow-500 hover:text-yellow-400 font-bold flex items-center gap-2 mt-8 border border-yellow-500/30 px-4 py-2 rounded-full hover:bg-yellow-500/10 transition-colors">
-                        🏆 Switch to Tournament Mode
+                        ðŸ† Switch to Tournament Mode
                     </button>
                 )}
 
@@ -1327,25 +1456,30 @@ export default function CricketPage() {
         );
     }
 
-    // --- Playing View ---
+
+    // --- Playing View (Scorer or Viewer watching Match) ---
     return (
         <div className="h-dvh bg-neutral-950 text-white flex flex-col items-center overflow-hidden">
             {/* ... (Header same) ... */}
             <div className="w-full px-3 py-2 flex justify-between items-center bg-neutral-900/50 backdrop-blur-md z-20 border-b border-neutral-800 shrink-0">
-                <Link href="/" className="flex items-center gap-2 text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-500 hover:text-white hover:opacity-80 transition-opacity">
-                    <ChevronLeft size={18} className="text-blue-500" /> SportsBoard
-                </Link>
+                <button onClick={() => userRole === 'viewer' ? setViewMode('dashboard') : setUserRole(null)} className="flex items-center gap-2 text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-500 hover:text-white hover:opacity-80 transition-opacity">
+                    <ChevronLeft size={18} className="text-blue-500" /> {userRole === 'viewer' ? 'Dashboard' : 'Roles'}
+                </button>
                 <div className="text-xs font-mono text-neutral-400 flex flex-col items-end">
                     <span>{currentBattingTeam.name} Batting</span>
                     {innings === 2 && targetRuns && <span className="text-yellow-400">Target: {targetRuns}</span>}
                 </div>
                 <div className="flex gap-2">
-                    <button onClick={saveMatch} className="px-2 py-1 bg-red-600/20 hover:bg-red-600 border border-red-500/50 text-red-200 hover:text-white rounded-md text-[10px] font-bold transition-all">
-                        END
-                    </button>
-                    <button onClick={() => setIsAdmin(!isAdmin)} className="p-1 rounded-full hover:bg-neutral-800 transition-colors">
-                        {isAdmin ? <Monitor size={16} className="text-green-400" /> : <Settings size={16} className="text-neutral-400" />}
-                    </button>
+                    {isAdmin && (
+                        <button onClick={saveMatch} className="px-2 py-1 bg-red-600/20 hover:bg-red-600 border border-red-500/50 text-red-200 hover:text-white rounded-md text-[10px] font-bold transition-all">
+                            END
+                        </button>
+                    )}
+                    {isAdmin && (
+                        <button onClick={() => setIsAdmin(!isAdmin)} className="p-1 rounded-full hover:bg-neutral-800 transition-colors">
+                            {isAdmin ? <Monitor size={16} className="text-green-400" /> : <Settings size={16} className="text-neutral-400" />}
+                        </button>
+                    )}
                 </div>
             </div>
 
