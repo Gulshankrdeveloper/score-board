@@ -111,7 +111,7 @@ const ActionButton = ({ onClick, label, color = "bg-blue-600", disabled = false 
 export default function CricketPage() {
     // --- Game Config State ---
     const [gameState, setGameState] = useState<GameState>("setup");
-    const [isAdmin, setIsAdmin] = useState(true);
+
 
     // History State
     const [matchHistory, setMatchHistory] = useState<MatchRecord[]>([]);
@@ -119,6 +119,22 @@ export default function CricketPage() {
 
     // Celebration State
     const [celebration, setCelebration] = useState<CelebrationType>(null);
+
+    // Admin State
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [showLogin, setShowLogin] = useState(false);
+    const [pin, setPin] = useState("");
+
+    const handleLogin = () => {
+        if (pin === "1234") {
+            setIsAdmin(true);
+            setShowLogin(false);
+            setPin("");
+        } else {
+            alert("Incorrect PIN");
+            setPin("");
+        }
+    };
 
     // --- Tournament State ---
     const [tournamentTeams, setTournamentTeams] = useState<TournamentTeam[]>([]);
@@ -1340,8 +1356,8 @@ export default function CricketPage() {
                     <button onClick={saveMatch} className="px-2 py-1 bg-red-600/20 hover:bg-red-600 border border-red-500/50 text-red-200 hover:text-white rounded-md text-[10px] font-bold transition-all">
                         END
                     </button>
-                    <button onClick={() => setIsAdmin(!isAdmin)} className="p-1 rounded-full hover:bg-neutral-800 transition-colors">
-                        {isAdmin ? <Monitor size={16} className="text-green-400" /> : <Settings size={16} className="text-neutral-400" />}
+                    <button onClick={() => isAdmin ? setIsAdmin(false) : setShowLogin(true)} className="p-1 rounded-full hover:bg-neutral-800 transition-colors">
+                        {isAdmin ? <Monitor size={16} className="text-green-400" /> : <Play size={16} className="text-neutral-400" />}
                     </button>
                 </div>
             </div>
@@ -1370,6 +1386,32 @@ export default function CricketPage() {
                                     {celebration === "4" ? "FOUR!" : celebration === "6" ? "SIX!" : "WICKET!"}
                                 </div>
                             </motion.div>
+                        </motion.div>
+                    )}
+
+                    {showLogin && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md"
+                        >
+                            <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-2xl w-full max-w-xs flex flex-col gap-4">
+                                <h3 className="text-xl font-bold text-center text-white">Scorer Login</h3>
+                                <div className="text-center text-xs text-neutral-500">Enter PIN to unlock controls</div>
+                                <input
+                                    type="password"
+                                    value={pin}
+                                    onChange={(e) => setPin(e.target.value)}
+                                    placeholder="PIN"
+                                    className="bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-center text-2xl tracking-widest text-white focus:border-blue-500 outline-none"
+                                    autoFocus
+                                />
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button onClick={() => setShowLogin(false)} className="py-2 rounded-lg bg-neutral-800 text-neutral-400 text-sm">Cancel</button>
+                                    <button onClick={handleLogin} className="py-2 rounded-lg bg-blue-600 text-white font-bold text-sm">Unlock</button>
+                                </div>
+                            </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
