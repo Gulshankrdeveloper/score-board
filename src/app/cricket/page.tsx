@@ -99,7 +99,7 @@ const ActionButton = ({ onClick, label, color = "bg-blue-600", disabled = false 
         onClick={onClick}
         disabled={disabled}
         className={cn(
-            "h-14 md:h-16 w-full rounded-xl text-xl md:text-2xl font-bold text-white shadow-lg transition-all hover:brightness-110 flex items-center justify-center",
+            "h-10 w-full rounded-lg text-lg font-bold text-white shadow-lg transition-all hover:brightness-110 flex items-center justify-center", // Reduced height to h-10, rounded-lg
             color,
             disabled && "opacity-50 cursor-not-allowed grayscale"
         )}
@@ -1317,26 +1317,27 @@ export default function CricketPage() {
 
     // --- Playing View ---
     return (
-        <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-center">
+        <div className="h-dvh bg-neutral-950 text-white flex flex-col items-center overflow-hidden">
             {/* ... (Header same) ... */}
-            <div className="w-full p-4 flex justify-between items-center bg-neutral-900/50 backdrop-blur-md sticky top-0 z-50 border-b border-neutral-800">
-                <Link href="/" className="flex items-center gap-2 text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-500 hover:text-white hover:opacity-80 transition-opacity">
-                    <ChevronLeft size={20} className="text-blue-500" /> &larr; SportsBoard
+            <div className="w-full px-3 py-2 flex justify-between items-center bg-neutral-900/50 backdrop-blur-md z-20 border-b border-neutral-800 shrink-0">
+                <Link href="/" className="flex items-center gap-2 text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-500 hover:text-white hover:opacity-80 transition-opacity">
+                    <ChevronLeft size={18} className="text-blue-500" /> SportsBoard
                 </Link>
-                <div className="text-sm font-mono text-neutral-400">
-                    {currentBattingTeam.name} Batting {innings === 2 && targetRuns && <span className="text-yellow-400 ml-2">(Target: {targetRuns})</span>}
+                <div className="text-xs font-mono text-neutral-400 flex flex-col items-end">
+                    <span>{currentBattingTeam.name} Batting</span>
+                    {innings === 2 && targetRuns && <span className="text-yellow-400">Target: {targetRuns}</span>}
                 </div>
                 <div className="flex gap-2">
-                    <button onClick={saveMatch} className="px-3 py-1 bg-red-600/20 hover:bg-red-600 border border-red-500/50 text-red-200 hover:text-white rounded-lg text-xs font-bold transition-all">
-                        End Match
+                    <button onClick={saveMatch} className="px-2 py-1 bg-red-600/20 hover:bg-red-600 border border-red-500/50 text-red-200 hover:text-white rounded-md text-[10px] font-bold transition-all">
+                        END
                     </button>
-                    <button onClick={() => setIsAdmin(!isAdmin)} className="p-2 rounded-full hover:bg-neutral-800 transition-colors">
-                        {isAdmin ? <Monitor size={20} className="text-green-400" /> : <Settings size={20} className="text-neutral-400" />}
+                    <button onClick={() => setIsAdmin(!isAdmin)} className="p-1 rounded-full hover:bg-neutral-800 transition-colors">
+                        {isAdmin ? <Monitor size={16} className="text-green-400" /> : <Settings size={16} className="text-neutral-400" />}
                     </button>
                 </div>
             </div>
 
-            <main className="flex-1 w-full max-w-lg flex flex-col p-4 gap-4 pb-24">
+            <main className="flex-1 w-full max-w-lg flex flex-col p-2 gap-2 overflow-hidden">
                 {/* Celebration Overlay */}
                 <AnimatePresence>
                     {celebration && (
@@ -1353,106 +1354,111 @@ export default function CricketPage() {
                                 className="text-center"
                             >
                                 <div className={cn(
-                                    "text-9xl font-black drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]",
+                                    "text-8xl font-black drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]",
                                     celebration === "4" ? "text-yellow-400" :
                                         celebration === "6" ? "text-purple-500" : "text-red-500"
                                 )}>
                                     {celebration === "4" ? "FOUR!" : celebration === "6" ? "SIX!" : "WICKET!"}
-                                </div>
-                                <div className="text-3xl font-bold text-white mt-4 tracking-widest uppercase">
-                                    {celebration === "4" ? "Outstanding Shot!" : celebration === "6" ? "Maximum!" : "Clean Bowled!"}
                                 </div>
                             </motion.div>
                         </motion.div>
                     )}
                 </AnimatePresence>
 
-                {/* Score Card */}
-                <div className="bg-gradient-to-br from-blue-900/40 to-indigo-900/40 border border-blue-500/30 p-6 rounded-3xl relative overflow-hidden text-center">
-                    <div className="text-sm uppercase tracking-widest text-blue-300/60 mb-1">{currentBattingTeam.name}</div>
-                    <div className="text-7xl font-black text-white leading-none mb-2">
-                        {totalRuns}/{totalWickets}
-                    </div>
-                    <div className="text-2xl font-mono text-blue-200">
-                        Overs: <span className="text-white">{overs}.{ballsInOver}</span>
-                    </div>
-                    <div className="flex justify-center gap-4 mt-4 text-xs text-neutral-400">
-                        <span>CRR: {(totalBalls > 0 ? (totalRuns / (totalBalls / 6)) : 0).toFixed(2)}</span>
-                        <span>Extras: {extras.w + extras.nb + extras.lb + extras.b}</span>
+                {/* Score Card - Compact */}
+                <div className="bg-gradient-to-br from-blue-900/40 to-indigo-900/40 border border-blue-500/30 p-2 rounded-2xl relative overflow-hidden flex flex-col justify-center shrink-0 min-h-[100px]">
+                    <div className="flex justify-between items-end px-4">
+                        <div className="text-left">
+                            <div className="text-xs uppercase tracking-widest text-blue-300/60">{currentBattingTeam.name}</div>
+                            <div className="text-6xl font-black text-white leading-none tracking-tighter">
+                                {totalRuns}/{totalWickets}
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-xl font-mono text-blue-200">
+                                <span className="text-white">{overs}.{ballsInOver}</span> <span className="text-sm text-blue-400">Overs</span>
+                            </div>
+                            <div className="text-xs text-neutral-400 mt-1">
+                                CRR: {(totalBalls > 0 ? (totalRuns / (totalBalls / 6)) : 0).toFixed(2)} | Ex: {extras.w + extras.nb + extras.lb + extras.b}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                {/* Batting Card */}
-                <div className="bg-neutral-900/50 rounded-2xl border border-neutral-800 p-4">
-                    <div className="flex justify-between items-center mb-2 text-xs text-neutral-500 uppercase font-semibold">
+                {/* Batting Card - Compact */}
+                <div className="bg-neutral-900/50 rounded-xl border border-neutral-800 p-2 shrink-0">
+                    <div className="flex justify-between items-center mb-1 text-[10px] text-neutral-500 uppercase font-semibold">
                         <span>Batsman</span>
                         <span>R (B)</span>
                     </div>
-                    {/* Striker */}
-                    <div onClick={() => !strikerId && console.log("Select Striker")} className={cn("flex justify-between items-center p-3 rounded-xl mb-2 border transition-all cursor-pointer", strikerId ? "bg-blue-500/20 border-blue-500/50" : "bg-red-500/10 border-red-500/30 animate-pulse")}>
-                        <div className="flex items-center gap-2">
-                            <span className="text-blue-400 font-black text-lg">*</span>
-                            {strikerId ? (
-                                <div>
-                                    <div className="font-bold text-lg">{striker?.name}</div>
-                                    <div className="text-xs text-blue-200">4s: {striker?.fours} | 6s: {striker?.sixes}</div>
-                                </div>
-                            ) : (
-                                <div className="text-red-300 italic">Select Striker...</div>
-                            )}
+                    <div className="space-y-1">
+                        {/* Striker */}
+                        <div onClick={() => !strikerId && console.log("Select Striker")} className={cn("flex justify-between items-center p-2 rounded-lg border transition-all cursor-pointer h-10", strikerId ? "bg-blue-500/20 border-blue-500/50" : "bg-red-500/10 border-red-500/30 animate-pulse")}>
+                            <div className="flex items-center gap-2">
+                                <span className="text-blue-400 font-black text-sm">*</span>
+                                {strikerId ? (
+                                    <div className="flex items-baseline gap-2">
+                                        <div className="font-bold text-sm">{striker?.name}</div>
+                                        <div className="text-[10px] text-blue-200">4s:{striker?.fours} 6s:{striker?.sixes}</div>
+                                    </div>
+                                ) : (
+                                    <div className="text-red-300 italic text-xs">Select Striker...</div>
+                                )}
+                            </div>
+                            <div className="text-sm font-mono font-bold">{striker?.runs ?? 0} <span className="text-xs opacity-50">({striker?.balls ?? 0})</span></div>
                         </div>
-                        <div className="text-xl font-mono font-bold">{striker?.runs ?? 0} <span className="text-sm opacity-50">({striker?.balls ?? 0})</span></div>
-                    </div>
 
-                    {/* Non-Striker */}
-                    <div className={cn("flex justify-between items-center p-3 rounded-xl border border-transparent", nonStrikerId ? "bg-neutral-800" : "bg-red-500/10 border-red-500/30 animate-pulse")}>
-                        <div className="flex items-center gap-2">
-                            {nonStrikerId ? (
-                                <div className="font-bold text-neutral-300">{nonStriker?.name}</div>
-                            ) : (
-                                <div className="text-red-300 italic">Select Non-Striker...</div>
-                            )}
+                        {/* Non-Striker */}
+                        <div className={cn("flex justify-between items-center p-2 rounded-lg border border-transparent h-10", nonStrikerId ? "bg-neutral-800" : "bg-red-500/10 border-red-500/30 animate-pulse")}>
+                            <div className="flex items-center gap-2">
+                                {nonStrikerId ? (
+                                    <div className="font-bold text-neutral-300 text-sm">{nonStriker?.name}</div>
+                                ) : (
+                                    <div className="text-red-300 italic text-xs">Select Non-Striker...</div>
+                                )}
+                            </div>
+                            <div className="text-sm font-mono text-neutral-500">{nonStriker?.runs ?? 0} <span className="text-xs opacity-50">({nonStriker?.balls ?? 0})</span></div>
                         </div>
-                        <div className="text-xl font-mono text-neutral-500">{nonStriker?.runs ?? 0} <span className="text-sm opacity-50">({nonStriker?.balls ?? 0})</span></div>
                     </div>
 
                     {/* Swap Button */}
                     {isAdmin && (
-                        <button onClick={swapStriker} className="w-full mt-2 py-2 flex items-center justify-center gap-2 text-neutral-400 hover:text-white bg-neutral-800/50 hover:bg-neutral-800 rounded-lg transition-colors text-sm">
-                            <ArrowLeftRight size={14} /> Swap Ends
+                        <button onClick={swapStriker} className="w-full mt-1 py-1 flex items-center justify-center gap-1 text-neutral-400 hover:text-white bg-neutral-800/50 hover:bg-neutral-800 rounded-md transition-colors text-xs">
+                            <ArrowLeftRight size={12} /> Swap
                         </button>
                     )}
                 </div>
 
-                {/* Bowling Card */}
-                <div className="bg-neutral-900/50 rounded-2xl border border-neutral-800 p-4">
-                    <div className="flex justify-between items-center mb-2 text-xs text-neutral-500 uppercase font-semibold">
+                {/* Bowling Card - Compact */}
+                <div className="bg-neutral-900/50 rounded-xl border border-neutral-800 p-2 shrink-0">
+                    <div className="flex justify-between items-center mb-1 text-[10px] text-neutral-500 uppercase font-semibold">
                         <span>Bowler</span>
                         <span>This Over: {thisOverRuns}</span>
                     </div>
-                    <div className={cn("flex justify-between items-center p-3 rounded-xl border cursor-pointer", bowlerId ? "bg-neutral-800 border-neutral-700" : "bg-yellow-500/10 border-yellow-500/30 animate-pulse")}>
+                    <div className={cn("flex justify-between items-center p-2 rounded-lg border cursor-pointer h-10", bowlerId ? "bg-neutral-800 border-neutral-700" : "bg-yellow-500/10 border-yellow-500/30 animate-pulse")}>
                         {bowlerId ? (
-                            <>
-                                <div className="font-bold text-neutral-200">{bowler?.name}</div>
-                                <div className="text-sm font-mono text-neutral-400">
-                                    {bowler?.bowling.wickets}-{bowler?.bowling.runs} <span className="text-xs ml-1">({(bowler?.bowling.overs || 0).toFixed(1)})</span>
+                            <div className="flex justify-between w-full items-center">
+                                <div className="font-bold text-neutral-200 text-sm">{bowler?.name}</div>
+                                <div className="flex gap-3 text-xs font-mono text-neutral-400">
+                                    <span title="Overs-Maidens-Runs-Wickets">{(bowler?.bowling.overs || 0).toFixed(1)}-{bowler?.bowling.maidens}-{bowler?.bowling.runs}-{bowler?.bowling.wickets}</span>
+                                    <span className="text-yellow-500" title="Economy Rate">E: {(bowler?.bowling.overs > 0 ? (bowler?.bowling.runs / bowler?.bowling.overs).toFixed(1) : "0.0")}</span>
                                 </div>
-                            </>
+                            </div>
                         ) : (
-                            <div className="text-yellow-500 italic w-full text-center">Select New Bowler</div>
+                            <div className="text-yellow-500 italic w-full text-center text-xs">Select Bowler</div>
                         )}
                     </div>
 
                     {/* Bowler Selection List */}
                     {!bowlerId && (
-                        <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
+                        <div className="mt-1 flex gap-2 overflow-x-auto pb-1">
                             {currentBowlingTeam.players.map(p => (
                                 <button
                                     key={p.id}
                                     onClick={() => setBowlerId(p.id)}
                                     disabled={p.id === lastOverBowlerId}
                                     className={cn(
-                                        "px-3 py-1 rounded-lg text-sm whitespace-nowrap border transition-colors",
+                                        "px-2 py-1 rounded text-xs whitespace-nowrap border transition-colors",
                                         p.id === lastOverBowlerId
                                             ? "bg-neutral-900 text-neutral-600 border-neutral-800 cursor-not-allowed opacity-50"
                                             : "bg-neutral-800 hover:bg-neutral-700 border-neutral-700"
@@ -1487,16 +1493,17 @@ export default function CricketPage() {
                     </AnimatePresence>
                 </div>
 
-                {/* Controls */}
+                {/* Controls - Compact */}
                 {isAdmin && (
-                    <div className="grid grid-cols-4 gap-3">
-                        <div className="col-span-4 flex justify-end mb-2">
+                    <div className="grid grid-cols-4 gap-2 w-full mt-auto shrink-0 pb-safe">
+                        <div className="col-span-4 flex justify-between items-center mb-1">
+                            <div className="text-[10px] text-neutral-500 font-mono">Use buttons to score</div>
                             <button
                                 onClick={undoLastBall}
                                 disabled={undoStack.length === 0}
-                                className="flex items-center gap-2 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-sm text-neutral-400 hover:text-white transition-colors"
+                                className="flex items-center gap-1 px-3 py-1 bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed rounded text-xs text-neutral-400 hover:text-white transition-colors border border-neutral-700"
                             >
-                                <RotateCcw size={16} /> Undo Last Ball
+                                <RotateCcw size={12} /> Undo
                             </button>
                         </div>
                         <ActionButton label="0" onClick={() => handleBall(0)} color="bg-neutral-800 text-neutral-400" disabled={!strikerId || !bowlerId} />
@@ -1506,9 +1513,9 @@ export default function CricketPage() {
                         <ActionButton label="4" onClick={() => handleBall(4)} color="bg-green-600" disabled={!strikerId || !bowlerId} />
                         <ActionButton label="6" onClick={() => handleBall(6)} color="bg-purple-600" disabled={!strikerId || !bowlerId} />
                         <ActionButton label="W" onClick={() => handleBall("W")} color="bg-red-600" disabled={!strikerId || !bowlerId} />
-                        <div className="grid grid-rows-2 gap-2">
-                            <button onClick={() => handleBall("WD")} disabled={!strikerId || !bowlerId} className="bg-orange-600/50 hover:bg-orange-600 rounded-lg font-bold text-white text-xs">WD</button>
-                            <button onClick={() => handleBall("NB")} disabled={!strikerId || !bowlerId} className="bg-orange-600/50 hover:bg-orange-600 rounded-lg font-bold text-white text-xs">NB</button>
+                        <div className="grid grid-rows-2 gap-1 h-10">
+                            <button onClick={() => handleBall("WD")} disabled={!strikerId || !bowlerId} className="bg-orange-600/50 hover:bg-orange-600 rounded-lg font-bold text-white text-[10px] flex items-center justify-center">WD</button>
+                            <button onClick={() => handleBall("NB")} disabled={!strikerId || !bowlerId} className="bg-orange-600/50 hover:bg-orange-600 rounded-lg font-bold text-white text-[10px] flex items-center justify-center">NB</button>
                         </div>
                     </div>
                 )}
