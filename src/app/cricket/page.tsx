@@ -1441,7 +1441,7 @@ export default function CricketPage() {
                                 <div className="font-bold text-neutral-200 text-sm">{bowler?.name}</div>
                                 <div className="flex gap-3 text-xs font-mono text-neutral-400">
                                     <span title="Overs-Maidens-Runs-Wickets">{(bowler?.bowling.overs || 0).toFixed(1)}-{bowler?.bowling.maidens}-{bowler?.bowling.runs}-{bowler?.bowling.wickets}</span>
-                                    <span className="text-yellow-500" title="Economy Rate">E: {(bowler?.bowling.overs > 0 ? (bowler?.bowling.runs / bowler?.bowling.overs).toFixed(1) : "0.0")}</span>
+                                    <span className="text-yellow-500" title="Economy Rate">E: {((bowler?.bowling.overs || 0) > 0 ? ((bowler?.bowling.runs || 0) / (bowler?.bowling.overs || 1)).toFixed(1) : "0.0")}</span>
                                 </div>
                             </div>
                         ) : (
