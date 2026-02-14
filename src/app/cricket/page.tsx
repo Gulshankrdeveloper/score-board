@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Settings, RotateCcw, Monitor, UserPlus, Users, ArrowLeftRight, Play, Trash2, ChevronLeft } from "lucide-react";
+import { Settings, RotateCcw, Monitor, UserPlus, Users, ArrowLeftRight, Play, Trash2, ChevronLeft, Bell, Calendar, Clock } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -822,57 +822,105 @@ export default function CricketPage() {
                         <section>
                             <div className="flex items-center gap-2 mb-3">
                                 <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                                <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider">Live Now</h2>
+                                <h2 className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Live Now</h2>
                             </div>
                             <div
                                 onClick={() => setViewMode('match')}
-                                className="bg-gradient-to-br from-neutral-900 to-neutral-950 border border-neutral-800 rounded-xl p-4 active:scale-95 transition-transform cursor-pointer hover:border-blue-500/30"
+                                className="bg-gradient-to-br from-neutral-900 to-neutral-800 border border-neutral-800 rounded-2xl p-5 active:scale-95 transition-transform cursor-pointer hover:border-red-500/30 shadow-lg relative overflow-hidden group"
                             >
-                                <div className="flex justify-between items-start mb-4">
-                                    <span className="bg-red-600/20 text-red-500 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-500/20">LIVE</span>
-                                    <span className="text-xs text-neutral-500">T20 Match</span>
+                                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <Play size={48} className="text-white transform rotate-12" />
                                 </div>
-                                <div className="flex justify-between items-center mb-2">
-                                    <div className="font-bold text-lg">{currentBattingTeam.name}</div>
-                                    <div className="text-2xl font-black">{totalRuns}/{totalWickets}</div>
+                                <div className="flex justify-between items-start mb-6">
+                                    <span className="bg-red-500/20 text-red-400 text-[10px] font-bold px-3 py-1 rounded-full border border-red-500/20 flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> LIVE
+                                    </span>
+                                    <span className="text-xs text-neutral-400 font-medium">T20 Match</span>
                                 </div>
-                                <div className="text-xs text-neutral-400">
-                                    {overs}.{ballsInOver} Overs • Target: {targetRuns || '-'}
+                                <div className="flex justify-between items-end mb-2">
+                                    <div>
+                                        <div className="text-sm text-neutral-400 mb-1">Batting</div>
+                                        <div className="font-bold text-2xl text-white leading-none">{currentBattingTeam.name}</div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-3xl font-black text-white leading-none">{totalRuns}/{totalWickets}</div>
+                                        <div className="text-xs text-neutral-400 mt-1">{overs}.{ballsInOver} Overs</div>
+                                    </div>
+                                </div>
+                                <div className="mt-4 pt-3 border-t border-white/5 flex justify-between items-center">
+                                    <div className="text-xs text-neutral-400">
+                                        Target: <span className="text-white font-bold">{targetRuns || '-'}</span>
+                                    </div>
+                                    <div className="text-xs text-blue-400 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                                        Watch <ChevronLeft className="rotate-180" size={12} />
+                                    </div>
                                 </div>
                             </div>
                         </section>
                     )}
 
-                    {/* Upcoming Section (Dummy) */}
+                    {/* Upcoming Section (Enhanced UI) */}
                     <section>
-                        <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-3">Upcoming</h2>
-                        <div className="bg-neutral-900/50 border border-neutral-800/50 rounded-xl p-4 opacity-75">
-                            <div className="flex justify-between text-sm mb-1">
-                                <span className="font-bold text-white">India vs Pakistan</span>
-                                <span className="text-blue-400">Tomorrow</span>
+                        <h2 className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3">Upcoming</h2>
+                        <div className="bg-[#0f0f0f] border border-neutral-800 rounded-2xl p-5 shadow-lg relative overflow-hidden">
+                            {/* Decorative gradients */}
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+
+                            <div className="flex justify-between items-start mb-6 relative">
+                                <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">UPCOMING</span>
+                                <span className="text-xs text-neutral-600">Group Stage</span>
                             </div>
-                            <div className="text-xs text-neutral-500">Champions Trophy • 2:00 PM</div>
+
+                            <div className="flex justify-between items-center mb-8 relative">
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-red-900/20 border border-red-500/30 flex items-center justify-center text-xs font-bold text-red-500">WI</div>
+                                        <span className="font-bold text-lg text-white">West Indies</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-blue-900/20 border border-blue-500/30 flex items-center justify-center text-xs font-bold text-blue-500">NP</div>
+                                        <span className="font-bold text-lg text-white">Nepal</span>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-neutral-400 text-sm mb-1">Tomorrow</div>
+                                    <div className="text-2xl font-bold text-white">11:00 AM</div>
+                                </div>
+                            </div>
+
+                            <button className="w-full bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white py-3 rounded-xl flex items-center justify-center gap-2 transition-colors font-medium text-sm relative">
+                                <Bell size={16} /> Remind Me
+                            </button>
                         </div>
                     </section>
 
                     {/* Recent Matches */}
                     <section>
-                        <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-3">Recent Results</h2>
-                        <div className="space-y-2">
+                        <h2 className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3">Recent Results</h2>
+                        <div className="space-y-3">
                             {matchHistory.length === 0 ? (
-                                <div className="text-xs text-neutral-600 italic">No completed matches yet.</div>
+                                <div className="p-8 text-center bg-neutral-900/30 rounded-2xl border border-neutral-800/50 border-dashed">
+                                    <div className="text-neutral-600 text-sm">No completed matches yet</div>
+                                </div>
                             ) : (
                                 matchHistory.map(m => (
                                     <div
                                         key={m.id}
-                                        onClick={() => { setSelectedMatch(m); setGameState("history"); }}
-                                        className="bg-neutral-900 border border-neutral-800 rounded-xl p-3 flex justify-between items-center cursor-pointer hover:bg-neutral-800 hover:border-blue-500/30 transition-all"
+                                        onClick={() => { setSelectedMatch(m); setGameState("history"); setViewMode("match"); }}
+                                        className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-4 cursor-pointer hover:bg-neutral-800 hover:border-neutral-700 transition-all group"
                                     >
-                                        <div>
-                                            <div className="text-sm font-bold text-white">{m.teamA.name} vs {m.teamB.name}</div>
-                                            <div className="text-xs text-neutral-500">{m.date} • {m.result}</div>
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="text-[10px] font-bold text-neutral-500 uppercase">{m.date}</div>
+                                            <div className="text-[10px] font-bold text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">RESULT</div>
                                         </div>
-                                        {/* For simplicity in this non-db version, we don't load old stats fully yet, just show record */}
+                                        <div className="flex justify-between items-center mb-2">
+                                            <div className="font-bold text-base text-white group-hover:text-blue-400 transition-colors">
+                                                {typeof m.teamA === 'string' ? m.teamA : m.teamA.name} <span className="text-neutral-600 mx-1">vs</span> {typeof m.teamB === 'string' ? m.teamB : m.teamB.name}
+                                            </div>
+                                        </div>
+                                        <div className="text-xs text-neutral-400 font-mono bg-black/20 p-2 rounded-lg truncate">
+                                            {m.result}
+                                        </div>
                                     </div>
                                 ))
                             )}
