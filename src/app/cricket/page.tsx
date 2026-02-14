@@ -863,7 +863,11 @@ export default function CricketPage() {
                                 <div className="text-xs text-neutral-600 italic">No completed matches yet.</div>
                             ) : (
                                 matchHistory.map(m => (
-                                    <div key={m.id} className="bg-neutral-900 border border-neutral-800 rounded-xl p-3 flex justify-between items-center">
+                                    <div
+                                        key={m.id}
+                                        onClick={() => { setSelectedMatch(m); setGameState("history"); }}
+                                        className="bg-neutral-900 border border-neutral-800 rounded-xl p-3 flex justify-between items-center cursor-pointer hover:bg-neutral-800 hover:border-blue-500/30 transition-all"
+                                    >
                                         <div>
                                             <div className="text-sm font-bold text-white">{m.teamA.name} vs {m.teamB.name}</div>
                                             <div className="text-xs text-neutral-500">{m.date} • {m.result}</div>
@@ -1176,8 +1180,15 @@ export default function CricketPage() {
             return (
                 <div className="min-h-screen bg-neutral-950 text-white p-4 md:p-8 flex flex-col items-center max-w-4xl mx-auto">
                     <div className="w-full flex justify-between items-center mb-6 border-b border-neutral-800 pb-4">
-                        <button onClick={() => setSelectedMatch(null)} className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors">
-                            &larr; Back to List
+                        <button onClick={() => {
+                            if (userRole === 'viewer') {
+                                setViewMode('dashboard');
+                                setSelectedMatch(null);
+                            } else {
+                                setSelectedMatch(null);
+                            }
+                        }} className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors">
+                            <ChevronLeft size={16} /> {userRole === 'viewer' ? 'Back to Dashboard' : 'Back to List'}
                         </button>
                         <h1 className="text-xl font-bold text-center">Match Details</h1>
                         <div className="w-20"></div> {/* Spacer */}
@@ -1359,7 +1370,7 @@ export default function CricketPage() {
             <div className="min-h-screen bg-neutral-950 text-white p-4 md:p-8 flex flex-col items-center max-w-4xl mx-auto">
                 <div className="w-full flex justify-between items-center mb-8">
                     <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500">Match History</h1>
-                    <button onClick={() => setGameState("setup")} className="text-neutral-400 hover:text-white">Back to Setup</button>
+                    <button onClick={() => userRole === 'viewer' ? setViewMode('dashboard') : setGameState("setup")} className="text-neutral-400 hover:text-white">{userRole === 'viewer' ? 'Back to Dashboard' : 'Back to Setup'}</button>
                 </div>
 
                 <div className="w-full space-y-4">
