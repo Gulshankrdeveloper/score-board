@@ -125,6 +125,11 @@ export const fetchLiveMatches = async (): Promise<ApiMatch[]> => {
         const allMatches = [...liveAndRecent, ...upcoming];
         const uniqueMatches = Array.from(new Map(allMatches.map(m => [m.id, m])).values());
 
+        if (uniqueMatches.length === 0) {
+            console.warn("API returned no matches or failed. Using Mock Data.");
+            return MOCK_MATCHES;
+        }
+
         // Sort: Live first, then Upcoming (soonest first), then Completed (recent first)
         return uniqueMatches.sort((a, b) => {
             if (a.status === 'Live' && b.status !== 'Live') return -1;
@@ -144,12 +149,51 @@ export const fetchLiveMatches = async (): Promise<ApiMatch[]> => {
     }
 };
 
+const MOCK_SCORECARD: ApiMatchScorecard = {
+    status: "success",
+    matchEnded: true,
+    scorecard: [
+        {
+            inning: "India Inning 1",
+            r: 285,
+            w: 7,
+            o: 50,
+            batting: [
+                { name: "Rohit Sharma", runs: "45", balls: "32", fours: "6", sixes: "2", strikeRate: "140.6", dismissal: "c Warner b Starc" },
+                { name: "Shubman Gill", runs: "102", balls: "88", fours: "12", sixes: "3", strikeRate: "115.9", dismissal: "b Zampa" },
+                { name: "Virat Kohli", runs: "76", balls: "84", fours: "5", sixes: "0", strikeRate: "90.4", dismissal: "run out" }
+            ],
+            bowling: [
+                { name: "Mitchell Starc", overs: "10", maidens: "1", runs: "55", wickets: "2", economy: "5.5" },
+                { name: "Adam Zampa", overs: "10", maidens: "0", runs: "48", wickets: "1", economy: "4.8" }
+            ]
+        },
+        {
+            inning: "Australia Inning 1",
+            r: 142,
+            w: 3,
+            o: 22.4,
+            batting: [
+                { name: "David Warner", runs: "52", balls: "40", fours: "7", sixes: "1", strikeRate: "130.0", dismissal: "b Bumrah" },
+                { name: "Travis Head", runs: "18", balls: "15", fours: "2", sixes: "0", strikeRate: "120.0", dismissal: "c Kohli b Shami" }
+            ],
+            bowling: [
+                { name: "Jasprit Bumrah", overs: "6", maidens: "1", runs: "24", wickets: "1", economy: "4.0" },
+                { name: "Mohammed Shami", overs: "5", maidens: "0", runs: "30", wickets: "1", economy: "6.0" }
+            ]
+        }
+    ]
+};
+
 export const fetchMatchScorecard = async (id: string): Promise<ApiMatchScorecard | null> => {
     try {
         const response = await fetch(`https://api.cricapi.com/v1/match_scorecard?apikey=${API_KEY}&id=${id}`);
         const data = await response.json();
 
-        if (data.status !== "success" || !data.data) return null;
+        if (data.status !== "success" || !data.data) {
+            console.warn("API Scorecard fetch failed. Using Mock Scorecard for demo.");
+            return MOCK_SCORECARD;
+        }
 
         return {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -183,7 +227,7 @@ export const fetchMatchScorecard = async (id: string): Promise<ApiMatchScorecard
         };
     } catch (error) {
         console.error("Failed to fetch scorecard:", error);
-        return null;
+        return MOCK_SCORECARD;
     }
 };
 
