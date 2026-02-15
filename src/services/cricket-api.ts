@@ -54,14 +54,36 @@ const MOCK_MATCHES: ApiMatch[] = [
     }
 ];
 
+export type ApiBatsman = {
+    name: string;
+    runs: string;
+    balls: string;
+    fours: string;
+    sixes: string;
+    strikeRate: string;
+    dismissal: string;
+};
+
+export type ApiBowler = {
+    name: string;
+    overs: string;
+    maidens: string;
+    runs: string;
+    wickets: string;
+    economy: string;
+};
+
+export type ApiInning = {
+    inning: string; // "Team A Inning 1"
+    r: number;
+    w: number;
+    o: number;
+    batting: ApiBatsman[];
+    bowling: ApiBowler[];
+};
 
 export type ApiMatchScorecard = {
-    scorecard: {
-        inning: string;
-        r: number;
-        w: number;
-        o: number;
-    }[];
+    scorecard: ApiInning[];
     status: string;
     matchEnded: boolean;
 };
@@ -130,7 +152,32 @@ export const fetchMatchScorecard = async (id: string): Promise<ApiMatchScorecard
         if (data.status !== "success" || !data.data) return null;
 
         return {
-            scorecard: data.data.scorecard || [],
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            scorecard: (data.data.scorecard || []).map((inning: any) => ({
+                inning: inning.inning,
+                r: inning.r,
+                w: inning.w,
+                o: inning.o,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                batting: (inning.batting || []).map((b: any) => ({
+                    name: b.batsman?.name || b.name || "Unknown",
+                    runs: b.r || b.runs || "0",
+                    balls: b.b || b.balls || "0",
+                    fours: b["4s"] || "0",
+                    sixes: b["6s"] || "0",
+                    strikeRate: b.sr || "0.00",
+                    dismissal: b.dismissal || b.dismissal_text || ""
+                })),
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                bowling: (inning.bowling || []).map((b: any) => ({
+                    name: b.bowler?.name || b.name || "Unknown",
+                    overs: b.o || b.overs || "0",
+                    maidens: b.m || b.maidens || "0",
+                    runs: b.r || b.runs || "0",
+                    wickets: b.w || b.wickets || "0",
+                    economy: b.eco || "0.00"
+                }))
+            })),
             status: data.data.status,
             matchEnded: data.data.matchEnded
         };

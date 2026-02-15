@@ -1105,22 +1105,83 @@ export default function CricketPage() {
                                         <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                                     </div>
                                 ) : globalMatchDetails?.scorecard ? (
-                                    <div className="space-y-4">
+                                    <div className="space-y-8">
                                         {globalMatchDetails.scorecard.map((inning, idx) => (
-                                            <div key={idx} className="space-y-2">
-                                                <h4 className="text-xs font-bold text-blue-400 uppercase tracking-widest bg-blue-500/10 p-2 rounded">
-                                                    {inning.inning}
+                                            <div key={idx} className="space-y-4">
+                                                <h4 className="text-sm font-bold text-blue-400 uppercase tracking-widest bg-blue-500/10 p-2 rounded flex justify-between items-center">
+                                                    <span>{inning.inning}</span>
+                                                    <span className="text-white">{inning.r}/{inning.w} <span className="text-neutral-500 text-xs">({inning.o} ov)</span></span>
                                                 </h4>
-                                                <div className="flex justify-between items-center p-3 bg-neutral-900 rounded-lg border border-neutral-800/50">
-                                                    <span className="text-sm font-medium text-neutral-300">Total Score</span>
-                                                    <span className="font-mono text-white font-bold">{inning.r}/{inning.w} <span className="text-neutral-500 text-xs">({inning.o} ov)</span></span>
+
+                                                {/* Batting Table */}
+                                                <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
+                                                    <table className="w-full text-left text-[10px] md:text-xs">
+                                                        <thead className="bg-neutral-800 text-neutral-400">
+                                                            <tr>
+                                                                <th className="p-2">Batsman</th>
+                                                                <th className="p-2 text-right">R</th>
+                                                                <th className="p-2 text-right">B</th>
+                                                                <th className="p-2 text-right hidden sm:table-cell">4s</th>
+                                                                <th className="p-2 text-right hidden sm:table-cell">6s</th>
+                                                                <th className="p-2 text-right">SR</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-neutral-800">
+                                                            {inning.batting.map((p, i) => (
+                                                                <tr key={i} className="hover:bg-neutral-800/50">
+                                                                    <td className="p-2 font-medium">
+                                                                        <div className="text-white">{p.name}</div>
+                                                                        <div className="text-[9px] text-neutral-500">{p.dismissal}</div>
+                                                                    </td>
+                                                                    <td className="p-2 text-right font-bold text-white">{p.runs}</td>
+                                                                    <td className="p-2 text-right text-neutral-400">{p.balls}</td>
+                                                                    <td className="p-2 text-right hidden sm:table-cell text-neutral-500">{p.fours}</td>
+                                                                    <td className="p-2 text-right hidden sm:table-cell text-neutral-500">{p.sixes}</td>
+                                                                    <td className="p-2 text-right text-neutral-500">{p.strikeRate}</td>
+                                                                </tr>
+                                                            ))}
+                                                            {inning.batting.length === 0 && (
+                                                                <tr><td colSpan={6} className="p-3 text-center text-neutral-500 italic">No batting data available.</td></tr>
+                                                            )}
+                                                        </tbody>
+                                                    </table>
                                                 </div>
-                                                {/* We can expand this with more details if the API provides specific batsman scores in this array */}
+
+                                                {/* Bowling Table */}
+                                                <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
+                                                    <table className="w-full text-left text-[10px] md:text-xs">
+                                                        <thead className="bg-neutral-800 text-neutral-400">
+                                                            <tr>
+                                                                <th className="p-2">Bowler</th>
+                                                                <th className="p-2 text-right">O</th>
+                                                                <th className="p-2 text-right">M</th>
+                                                                <th className="p-2 text-right">R</th>
+                                                                <th className="p-2 text-right">W</th>
+                                                                <th className="p-2 text-right">Econ</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-neutral-800">
+                                                            {inning.bowling.map((p, i) => (
+                                                                <tr key={i} className="hover:bg-neutral-800/50">
+                                                                    <td className="p-2 font-medium text-white">{p.name}</td>
+                                                                    <td className="p-2 text-right text-white">{p.overs}</td>
+                                                                    <td className="p-2 text-right text-neutral-500">{p.maidens}</td>
+                                                                    <td className="p-2 text-right text-neutral-400">{p.runs}</td>
+                                                                    <td className="p-2 text-right font-bold text-white">{p.wickets}</td>
+                                                                    <td className="p-2 text-right text-neutral-500">{p.economy}</td>
+                                                                </tr>
+                                                            ))}
+                                                            {inning.bowling.length === 0 && (
+                                                                <tr><td colSpan={6} className="p-3 text-center text-neutral-500 italic">No bowling data available.</td></tr>
+                                                            )}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
                                             </div>
                                         ))}
                                         {globalMatchDetails.scorecard.length === 0 && (
                                             <div className="text-center text-neutral-500 text-sm py-8">
-                                                Detailed scorecard not available yet.
+                                                Detailed scorecard not available for this match type yet.
                                             </div>
                                         )}
                                     </div>
