@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Settings, RotateCcw, Monitor, UserPlus, Users, ArrowLeftRight, Play, Trash2, ChevronLeft, Bell, Calendar, Clock } from "lucide-react";
+import { Settings, RotateCcw, Monitor, UserPlus, Users, ArrowLeftRight, Play, Trash2, ChevronLeft, Bell, Calendar, Clock, X } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 
-import { fetchLiveMatches, ApiMatch } from "@/services/cricket-api";
+
+import { fetchLiveMatches, fetchMatchScorecard, ApiMatch, ApiMatchScorecard } from "@/services/cricket-api";
 
 // --- Types ---
 type Player = {
@@ -153,6 +154,11 @@ export default function CricketPage() {
     // --- API Integration State ---
     const [activeTab, setActiveTab] = useState<'local' | 'global'>('local');
     const [globalMatches, setGlobalMatches] = useState<ApiMatch[]>([]);
+
+    // Global Match Details State
+    const [selectedGlobalMatch, setSelectedGlobalMatch] = useState<ApiMatch | null>(null);
+    const [globalMatchDetails, setGlobalMatchDetails] = useState<ApiMatchScorecard | null>(null);
+    const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
     useEffect(() => {
         const loadGlobalMatches = async () => {
@@ -868,7 +874,18 @@ export default function CricketPage() {
                                 </div>
                             )}
                             {globalMatches.map(match => (
-                                <div key={match.id} className="bg-[#0f0f0f] border border-neutral-800 rounded-2xl p-5 shadow-lg relative overflow-hidden group">
+                                <div
+                                    key={match.id}
+                                    onClick={async () => {
+                                        setSelectedGlobalMatch(match);
+                                        setIsLoadingDetails(true);
+                                        setGlobalMatchDetails(null);
+                                        const details = await fetchMatchScorecard(match.id);
+                                        setGlobalMatchDetails(details);
+                                        setIsLoadingDetails(false);
+                                    }}
+                                    className="bg-[#0f0f0f] border border-neutral-800 rounded-2xl p-5 shadow-lg relative overflow-hidden group cursor-pointer hover:border-neutral-700 transition-colors"
+                                >
                                     {match.status === 'Live' && (
                                         <div className="absolute top-0 right-0 w-20 h-20 bg-red-500/10 rounded-full blur-2xl -mr-5 -mt-5 pointer-events-none animate-pulse"></div>
                                     )}
@@ -1046,6 +1063,76 @@ export default function CricketPage() {
                         </>
                     )}
                 </div>
+                {/* Global Match Details Modal */}
+                {selectedGlobalMatch && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                        <div className="bg-[#111] border border-neutral-800 rounded-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+                            {/* Header */}
+                            <div className="p-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/50">
+                                <div>
+                                    <h3 className="font-bold text-white">{selectedGlobalMatch.series || 'Match Details'}</h3>
+                                    <div className="text-xs text-neutral-400">{selectedGlobalMatch.status} • {selectedGlobalMatch.textStatus}</div>
+                                </div>
+                                <button
+                                    onClick={() => setSelectedGlobalMatch(null)}
+                                    className="p-2 hover:bg-neutral-800 rounded-full transition-colors"
+                                >
+                                    <X size={20} className="text-neutral-400" />
+                                </button>
+                            </div>
+
+                            {/* Content */}
+                            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                                {/* Score Header */}
+                                <div className="flex justify-between items-center bg-gradient-to-br from-neutral-800/50 to-neutral-900/50 p-4 rounded-xl border border-neutral-800">
+                                    <div className="text-center">
+                                        <div className="font-bold text-2xl text-white">{selectedGlobalMatch.teamA.split(' ')[0]}</div>
+                                        <div className="text-xs text-neutral-500 font-mono">
+                                            {globalMatchDetails?.scorecard?.[0]?.r}/{globalMatchDetails?.scorecard?.[0]?.w} ({globalMatchDetails?.scorecard?.[0]?.o})
+                                        </div>
+                                    </div>
+                                    <div className="text-neutral-600 font-bold text-xs">VS</div>
+                                    <div className="text-center">
+                                        <div className="font-bold text-2xl text-white">{selectedGlobalMatch.teamB.split(' ')[0]}</div>
+                                        <div className="text-xs text-neutral-500 font-mono">
+                                            {globalMatchDetails?.scorecard?.[1]?.r || 0}/{globalMatchDetails?.scorecard?.[1]?.w || 0} ({globalMatchDetails?.scorecard?.[1]?.o || 0})
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {isLoadingDetails ? (
+                                    <div className="flex justify-center p-8">
+                                        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                    </div>
+                                ) : globalMatchDetails?.scorecard ? (
+                                    <div className="space-y-4">
+                                        {globalMatchDetails.scorecard.map((inning, idx) => (
+                                            <div key={idx} className="space-y-2">
+                                                <h4 className="text-xs font-bold text-blue-400 uppercase tracking-widest bg-blue-500/10 p-2 rounded">
+                                                    {inning.inning}
+                                                </h4>
+                                                <div className="flex justify-between items-center p-3 bg-neutral-900 rounded-lg border border-neutral-800/50">
+                                                    <span className="text-sm font-medium text-neutral-300">Total Score</span>
+                                                    <span className="font-mono text-white font-bold">{inning.r}/{inning.w} <span className="text-neutral-500 text-xs">({inning.o} ov)</span></span>
+                                                </div>
+                                                {/* We can expand this with more details if the API provides specific batsman scores in this array */}
+                                            </div>
+                                        ))}
+                                        {globalMatchDetails.scorecard.length === 0 && (
+                                            <div className="text-center text-neutral-500 text-sm py-8">
+                                                Detailed scorecard not available yet.
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="text-center text-neutral-500 text-sm py-8">
+                                        Failed to load match details.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div >
         );
     }

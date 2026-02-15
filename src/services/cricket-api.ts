@@ -54,37 +54,89 @@ const MOCK_MATCHES: ApiMatch[] = [
     }
 ];
 
+
+export type ApiMatchScorecard = {
+    scorecard: {
+        inning: string;
+        r: number;
+        w: number;
+        o: number;
+    }[];
+    status: string;
+    matchEnded: boolean;
+};
+
 export const fetchLiveMatches = async (): Promise<ApiMatch[]> => {
-
-
     try {
-        const response = await fetch(`https://api.cricapi.com/v1/currentMatches?apikey=${API_KEY}&offset=0`);
-        const data = await response.json();
+        const [currentResp, matchesResp] = await Promise.all([
+            fetch(`https://api.cricapi.com/v1/currentMatches?apikey=${API_KEY}&offset=0`),
+            fetch(`https://api.cricapi.com/v1/matches?apikey=${API_KEY}&offset=0`)
+        ]);
 
-        if (data.status !== "success" || !data.data) {
-            console.error("API Error:", data);
-            return MOCK_MATCHES;
-        }
+        const currentData = await currentResp.json();
+        const matchesData = await matchesResp.json();
 
-        // Map API response to our app's format
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return data.data.map((match: any) => ({
+        const mapMatch = (match: any): ApiMatch => ({
             id: match.id,
-            teamA: match.teams[0],
-            teamB: match.teams[1],
+            teamA: match.teams[0] || match.teamInfo?.[0]?.name || "Team A",
+            teamB: match.teams[1] || match.teamInfo?.[1]?.name || "Team B",
             teamAImage: match.teamInfo?.[0]?.img,
             teamBImage: match.teamInfo?.[1]?.img,
-            scoreA: "", // Complex parsing needed for scores usually, keeping simple for now
+            scoreA: "",
             scoreB: "",
-            status: match.matchEnded ? "Completed" : "Live",
+            status: !match.matchStarted ? "Upcoming" : (match.matchEnded ? "Completed" : "Live"),
             textStatus: match.status,
             series: match.name,
-            startTime: match.dateTimeGMT,
+            startTime: match.dateTimeGMT, // e.g. "2026-02-15T13:00:00"
             isMock: false
-        }));
+        });
+
+        const liveAndRecent = (currentData.data || []).map(mapMatch);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const upcoming = (matchesData.data || [])
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .filter((m: any) => !m.matchStarted)
+            .map(mapMatch);
+
+        // Merge and deduplicate by ID
+        const allMatches = [...liveAndRecent, ...upcoming];
+        const uniqueMatches = Array.from(new Map(allMatches.map(m => [m.id, m])).values());
+
+        // Sort: Live first, then Upcoming (soonest first), then Completed (recent first)
+        return uniqueMatches.sort((a, b) => {
+            if (a.status === 'Live' && b.status !== 'Live') return -1;
+            if (b.status === 'Live' && a.status !== 'Live') return 1;
+
+            // If both upcoming, sort by time asc
+            if (a.status === 'Upcoming' && b.status === 'Upcoming') {
+                return (a.startTime || '').localeCompare(b.startTime || '');
+            }
+            // If both completed, sort by time desc (roughly, or just keep order)
+            return 0;
+        });
 
     } catch (error) {
         console.error("Failed to fetch matches:", error);
         return MOCK_MATCHES;
     }
 };
+
+export const fetchMatchScorecard = async (id: string): Promise<ApiMatchScorecard | null> => {
+    try {
+        const response = await fetch(`https://api.cricapi.com/v1/match_scorecard?apikey=${API_KEY}&id=${id}`);
+        const data = await response.json();
+
+        if (data.status !== "success" || !data.data) return null;
+
+        return {
+            scorecard: data.data.scorecard || [],
+            status: data.data.status,
+            matchEnded: data.data.matchEnded
+        };
+    } catch (error) {
+        console.error("Failed to fetch scorecard:", error);
+        return null;
+    }
+};
+
