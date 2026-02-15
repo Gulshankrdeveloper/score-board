@@ -153,6 +153,7 @@ export default function CricketPage() {
 
     // --- API Integration State ---
     const [activeTab, setActiveTab] = useState<'local' | 'global'>('local');
+    const [activeSubTab, setActiveSubTab] = useState<'live' | 'upcoming' | 'completed'>('live');
     const [globalMatches, setGlobalMatches] = useState<ApiMatch[]>([]);
 
     // Global Match Details State
@@ -836,11 +837,11 @@ export default function CricketPage() {
                     <button onClick={() => setUserRole(null)} className="text-xs text-neutral-500 hover:text-white">Switch Role</button>
                 </div>
 
-                {/* Tab Switcher */}
+                {/* Main Tab Switcher */}
                 <div className="px-4 pt-4 pb-2">
                     <div className="flex p-1 bg-neutral-900 rounded-xl border border-neutral-800">
                         <button
-                            onClick={() => setActiveTab('local')}
+                            onClick={() => { setActiveTab('local'); setActiveSubTab('live'); }}
                             className={cn(
                                 "flex-1 py-2 text-sm font-bold rounded-lg transition-all",
                                 activeTab === 'local' ? "bg-neutral-800 text-white shadow-sm" : "text-neutral-500 hover:text-neutral-300"
@@ -849,7 +850,7 @@ export default function CricketPage() {
                             Local Matches
                         </button>
                         <button
-                            onClick={() => setActiveTab('global')}
+                            onClick={() => { setActiveTab('global'); setActiveSubTab('live'); }}
                             className={cn(
                                 "flex-1 py-2 text-sm font-bold rounded-lg transition-all",
                                 activeTab === 'global' ? "bg-neutral-800 text-white shadow-sm" : "text-neutral-500 hover:text-neutral-300"
@@ -860,208 +861,254 @@ export default function CricketPage() {
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                    {/* GLOBAL MATCHES TAB */}
-                    {activeTab === 'global' && (
-                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            {/* Demo Data Warning */}
-                            {globalMatches.some(m => m.isMock) && (
-                                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2 flex items-center justify-center gap-2">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse"></div>
-                                    <div className="text-[10px] font-bold text-yellow-500 uppercase tracking-widest text-center">
-                                        Demo Data • Add API Key for Real Matches
-                                    </div>
-                                </div>
-                            )}
-                            {globalMatches.map(match => (
-                                <div
-                                    key={match.id}
-                                    onClick={async () => {
-                                        setSelectedGlobalMatch(match);
-                                        setIsLoadingDetails(true);
-                                        setGlobalMatchDetails(null);
-                                        const details = await fetchMatchScorecard(match.id);
-                                        setGlobalMatchDetails(details);
-                                        setIsLoadingDetails(false);
-                                    }}
-                                    className="bg-[#0f0f0f] border border-neutral-800 rounded-2xl p-5 shadow-lg relative overflow-hidden group cursor-pointer hover:border-neutral-700 transition-colors"
-                                >
-                                    {match.status === 'Live' && (
-                                        <div className="absolute top-0 right-0 w-20 h-20 bg-red-500/10 rounded-full blur-2xl -mr-5 -mt-5 pointer-events-none animate-pulse"></div>
+                {/* Sub-Tab Switcher (Live / Upcoming / Results) */}
+                <div className="px-4 pb-4">
+                    <div className="flex justify-between items-center border-b border-neutral-800 pb-1">
+                        {['live', 'upcoming', 'completed'].map((tab) => (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveSubTab(tab as any)}
+                                className={cn(
+                                    "px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all relative",
+                                    activeSubTab === tab ? "text-blue-400" : "text-neutral-500 hover:text-neutral-300"
+                                )}
+                            >
+                                {tab === 'completed' ? 'Results' : tab}
+                                {activeSubTab === tab && (
+                                    <motion.div
+                                        layoutId="activeSubTab"
+                                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 rounded-full"
+                                    />
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Content Area with Sliding Animation */}
+                <div className="flex-1 overflow-y-auto px-4 pb-20 overflow-x-hidden relative">
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={`${activeTab}-${activeSubTab}`}
+                            initial={{ x: 20, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            exit={{ x: -20, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="space-y-4"
+                        >
+                            {/* --- GLOBAL (INTERNATIONAL) MATCHES --- */}
+                            {activeTab === 'global' && (
+                                <>
+                                    {/* Demo Warning (Show only once at top if needed, or in Live tab) */}
+                                    {activeSubTab === 'live' && globalMatches.some(m => m.isMock) && (
+                                        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2 flex items-center justify-center gap-2 mb-4">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse"></div>
+                                            <div className="text-[10px] font-bold text-yellow-500 uppercase tracking-widest text-center">
+                                                Demo Data • Add API Key for Real Matches
+                                            </div>
+                                        </div>
                                     )}
 
-                                    <div className="flex justify-between items-start mb-4 relative">
-                                        <div className="flex items-center gap-2">
-                                            {match.status === 'Live' ? (
-                                                <span className="bg-red-500/20 text-red-500 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-500/20 flex items-center gap-1">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> LIVE
-                                                </span>
-                                            ) : (
-                                                <span className="bg-neutral-800 text-neutral-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-neutral-700">
-                                                    {match.status.toUpperCase()}
-                                                </span>
-                                            )}
-                                            <span className="text-xs text-neutral-500">{match.series}</span>
-                                        </div>
-                                        {match.startTime && <div className="text-xs text-blue-400 font-bold">{match.startTime}</div>}
-                                    </div>
+                                    {/* Filter Global Matches */}
+                                    {(() => {
+                                        const filteredMatches = globalMatches.filter(m => {
+                                            if (activeSubTab === 'live') return m.status === 'Live';
+                                            if (activeSubTab === 'upcoming') return m.status === 'Upcoming';
+                                            if (activeSubTab === 'completed') return m.status === 'Completed' || m.status.includes('Result');
+                                            return false;
+                                        });
 
-                                    <div className="flex justify-between items-center mb-4 relative">
-                                        <div className="flex flex-col gap-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center text-xs font-bold text-neutral-300 shadow-inner">
-                                                    {match.teamA.substring(0, 2).toUpperCase()}
+                                        if (filteredMatches.length === 0) {
+                                            return (
+                                                <div className="flex flex-col items-center justify-center py-12 text-neutral-500">
+                                                    <div className="bg-neutral-900 p-4 rounded-full mb-4 opacity-50"><Calendar size={24} /></div>
+                                                    <p className="text-sm">No {activeSubTab} international matches found.</p>
                                                 </div>
-                                                <div>
-                                                    <div className="font-bold text-white leading-none">{match.teamA}</div>
-                                                    <div className="text-sm text-neutral-400 font-mono mt-0.5">{match.scoreA}</div>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center text-xs font-bold text-neutral-300 shadow-inner">
-                                                    {match.teamB.substring(0, 2).toUpperCase()}
-                                                </div>
-                                                <div>
-                                                    <div className="font-bold text-white leading-none">{match.teamB}</div>
-                                                    <div className="text-sm text-neutral-400 font-mono mt-0.5">{match.scoreB}</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                            );
+                                        }
 
-                                    <div className="pt-3 border-t border-neutral-800/50 flex justify-between items-center">
-                                        <div className="text-xs text-blue-300 font-medium truncate max-w-[200px]">
-                                            {match.textStatus}
-                                        </div>
-                                        <button className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-1.5 rounded-lg transition-colors">
-                                            Details
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-
-                            <div className="p-4 text-center rounded-xl border border-dashed border-neutral-800">
-                                <div className="text-xs text-neutral-600">
-                                    Data provided by <span className="font-bold text-neutral-500">Cricket API</span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* LOCAL MATCHES TAB */}
-                    {activeTab === 'local' && (
-                        <>
-                            {/* Live Section */}
-                            {gameState !== 'setup' && (
-                                <section>
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                                        <h2 className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Live Now</h2>
-                                    </div>
-                                    <div
-                                        onClick={() => setViewMode('match')}
-                                        className="bg-gradient-to-br from-neutral-900 to-neutral-800 border border-neutral-800 rounded-2xl p-5 active:scale-95 transition-transform cursor-pointer hover:border-red-500/30 shadow-lg relative overflow-hidden group"
-                                    >
-                                        <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                                            <Play size={48} className="text-white transform rotate-12" />
-                                        </div>
-                                        <div className="flex justify-between items-start mb-6">
-                                            <span className="bg-red-500/20 text-red-400 text-[10px] font-bold px-3 py-1 rounded-full border border-red-500/20 flex items-center gap-1">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> LIVE
-                                            </span>
-                                            <span className="text-xs text-neutral-400 font-medium">T20 Match</span>
-                                        </div>
-                                        <div className="flex justify-between items-end mb-2">
-                                            <div>
-                                                <div className="text-sm text-neutral-400 mb-1">Batting</div>
-                                                <div className="font-bold text-2xl text-white leading-none">{currentBattingTeam.name}</div>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-3xl font-black text-white leading-none">{totalRuns}/{totalWickets}</div>
-                                                <div className="text-xs text-neutral-400 mt-1">{overs}.{ballsInOver} Overs</div>
-                                            </div>
-                                        </div>
-                                        <div className="mt-4 pt-3 border-t border-white/5 flex justify-between items-center">
-                                            <div className="text-xs text-neutral-400">
-                                                Target: <span className="text-white font-bold">{targetRuns || '-'}</span>
-                                            </div>
-                                            <div className="text-xs text-blue-400 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                                                Watch <ChevronLeft className="rotate-180" size={12} />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </section>
-                            )}
-
-                            {/* Upcoming Section (Enhanced UI) */}
-                            <section>
-                                <h2 className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3">Upcoming</h2>
-                                <div className="bg-[#0f0f0f] border border-neutral-800 rounded-2xl p-5 shadow-lg relative overflow-hidden">
-                                    {/* Decorative gradients */}
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
-
-                                    <div className="flex justify-between items-start mb-6 relative">
-                                        <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">UPCOMING</span>
-                                        <span className="text-xs text-neutral-600">Group Stage</span>
-                                    </div>
-
-                                    <div className="flex justify-between items-center mb-8 relative">
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-red-900/20 border border-red-500/30 flex items-center justify-center text-xs font-bold text-red-500">WI</div>
-                                                <span className="font-bold text-lg text-white">West Indies</span>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-blue-900/20 border border-blue-500/30 flex items-center justify-center text-xs font-bold text-blue-500">NP</div>
-                                                <span className="font-bold text-lg text-white">Nepal</span>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-neutral-400 text-sm mb-1">Tomorrow</div>
-                                            <div className="text-2xl font-bold text-white">11:00 AM</div>
-                                        </div>
-                                    </div>
-
-                                    <button className="w-full bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white py-3 rounded-xl flex items-center justify-center gap-2 transition-colors font-medium text-sm relative">
-                                        <Bell size={16} /> Remind Me
-                                    </button>
-                                </div>
-                            </section>
-
-                            {/* Recent Matches */}
-                            <section>
-                                <h2 className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3">Recent Results</h2>
-                                <div className="space-y-3">
-                                    {matchHistory.length === 0 ? (
-                                        <div className="p-8 text-center bg-neutral-900/30 rounded-2xl border border-neutral-800/50 border-dashed">
-                                            <div className="text-neutral-600 text-sm">No completed matches yet</div>
-                                        </div>
-                                    ) : (
-                                        matchHistory.map(m => (
+                                        return filteredMatches.map(match => (
                                             <div
-                                                key={m.id}
-                                                onClick={() => { setSelectedMatch(m); setGameState("history"); setViewMode("match"); }}
-                                                className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-4 cursor-pointer hover:bg-neutral-800 hover:border-neutral-700 transition-all group"
+                                                key={match.id}
+                                                onClick={async () => {
+                                                    setSelectedGlobalMatch(match);
+                                                    setIsLoadingDetails(true);
+                                                    setGlobalMatchDetails(null);
+                                                    const details = await fetchMatchScorecard(match.id);
+                                                    setGlobalMatchDetails(details);
+                                                    setIsLoadingDetails(false);
+                                                }}
+                                                className="bg-[#0f0f0f] border border-neutral-800 rounded-2xl p-5 shadow-lg relative overflow-hidden group cursor-pointer hover:border-neutral-700 transition-colors"
                                             >
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <div className="text-[10px] font-bold text-neutral-500 uppercase">{m.date}</div>
-                                                    <div className="text-[10px] font-bold text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">RESULT</div>
+                                                {match.status === 'Live' && (
+                                                    <div className="absolute top-0 right-0 w-20 h-20 bg-red-500/10 rounded-full blur-2xl -mr-5 -mt-5 pointer-events-none animate-pulse"></div>
+                                                )}
+
+                                                <div className="flex justify-between items-start mb-4 relative">
+                                                    <div className="flex items-center gap-2">
+                                                        {match.status === 'Live' ? (
+                                                            <span className="bg-red-500/20 text-red-500 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-500/20 flex items-center gap-1">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> LIVE
+                                                            </span>
+                                                        ) : (
+                                                            <span className="bg-neutral-800 text-neutral-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-neutral-700">
+                                                                {match.status.toUpperCase()}
+                                                            </span>
+                                                        )}
+                                                        <span className="text-xs text-neutral-500 truncate max-w-[150px]">{match.series}</span>
+                                                    </div>
+                                                    {match.startTime && <div className="text-xs text-blue-400 font-bold">{match.startTime.split('T')[0]}</div>}
                                                 </div>
-                                                <div className="flex justify-between items-center mb-2">
-                                                    <div className="font-bold text-base text-white group-hover:text-blue-400 transition-colors">
-                                                        {typeof m.teamA === 'string' ? m.teamA : m.teamA.name} <span className="text-neutral-600 mx-1">vs</span> {typeof m.teamB === 'string' ? m.teamB : m.teamB.name}
+
+                                                <div className="flex flex-col gap-3 mb-4">
+                                                    <div className="flex justify-between items-center">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center text-xs font-bold text-neutral-300 shadow-inner">
+                                                                {match.teamA.substring(0, 2).toUpperCase()}
+                                                            </div>
+                                                            <span className="font-bold text-white">{match.teamA}</span>
+                                                        </div>
+                                                        <div className="text-sm text-neutral-400 font-mono">{match.scoreA}</div>
+                                                    </div>
+                                                    <div className="flex justify-between items-center">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center text-xs font-bold text-neutral-300 shadow-inner">
+                                                                {match.teamB.substring(0, 2).toUpperCase()}
+                                                            </div>
+                                                            <span className="font-bold text-white">{match.teamB}</span>
+                                                        </div>
+                                                        <div className="text-sm text-neutral-400 font-mono">{match.scoreB}</div>
                                                     </div>
                                                 </div>
-                                                <div className="text-xs text-neutral-400 font-mono bg-black/20 p-2 rounded-lg truncate">
-                                                    {m.result}
+
+                                                <div className="pt-3 border-t border-neutral-800/50 flex justify-between items-center">
+                                                    <div className="text-xs text-blue-300 font-medium truncate max-w-[200px]">
+                                                        {match.textStatus}
+                                                    </div>
+                                                    <button className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                                                        Details <ChevronLeft size={10} className="rotate-180" />
+                                                    </button>
                                                 </div>
                                             </div>
-                                        ))
+                                        ));
+                                    })()}
+                                </>
+                            )}
+
+                            {/* --- LOCAL MATCHES --- */}
+                            {activeTab === 'local' && (
+                                <>
+                                    {/* Local: LIVE */}
+                                    {activeSubTab === 'live' && (
+                                        gameState === 'setup' || gameState === 'tournament-setup' ? (
+                                            <div className="flex flex-col items-center justify-center py-12 text-neutral-500">
+                                                <div className="bg-neutral-900 p-4 rounded-full mb-4 opacity-50"><Play size={24} /></div>
+                                                <p className="text-sm">No match currently in progress.</p>
+                                                <p className="text-xs mt-2">Start a new match as Scorer.</p>
+                                            </div>
+                                        ) : (
+                                            <div
+                                                onClick={() => setViewMode('match')}
+                                                className="bg-gradient-to-br from-neutral-900 to-neutral-800 border border-neutral-800 rounded-2xl p-5 active:scale-95 transition-transform cursor-pointer hover:border-red-500/30 shadow-lg relative overflow-hidden group"
+                                            >
+                                                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                                                    <Play size={48} className="text-white transform rotate-12" />
+                                                </div>
+                                                <div className="flex justify-between items-start mb-6">
+                                                    <span className="bg-red-500/20 text-red-400 text-[10px] font-bold px-3 py-1 rounded-full border border-red-500/20 flex items-center gap-1">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> LIVE
+                                                    </span>
+                                                    <span className="text-xs text-neutral-400 font-medium">Local Match</span>
+                                                </div>
+                                                <div className="flex justify-between items-end mb-2">
+                                                    <div>
+                                                        <div className="text-sm text-neutral-400 mb-1">Batting</div>
+                                                        <div className="font-bold text-2xl text-white leading-none">{currentBattingTeam.name}</div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="text-3xl font-black text-white leading-none">{totalRuns}/{totalWickets}</div>
+                                                        <div className="text-xs text-neutral-400 mt-1">{overs}.{ballsInOver} Overs</div>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-4 pt-3 border-t border-white/5 flex justify-between items-center">
+                                                    <div className="text-xs text-neutral-400">
+                                                        Target: <span className="text-white font-bold">{targetRuns || '-'}</span>
+                                                    </div>
+                                                    <div className="text-xs text-blue-400 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                                                        Watch <ChevronLeft className="rotate-180" size={12} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )
                                     )}
-                                </div>
-                            </section>
-                        </>
-                    )}
+
+                                    {/* Local: UPCOMING */}
+                                    {activeSubTab === 'upcoming' && (
+                                        tournamentMatches.filter(m => !m.completed && !m.winnerId).length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-12 text-neutral-500">
+                                                <div className="bg-neutral-900 p-4 rounded-full mb-4 opacity-50"><Calendar size={24} /></div>
+                                                <p className="text-sm">No scheduled matches.</p>
+                                                <p className="text-xs mt-2">Create a Tournament to schedule games.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest px-1">Tournament Schedule</h3>
+                                                {tournamentMatches.filter(m => !m.completed).map((m, i) => {
+                                                    const tTeamA = tournamentTeams.find(t => t.id === m.teamAId);
+                                                    const tTeamB = tournamentTeams.find(t => t.id === m.teamBId);
+                                                    return (
+                                                        <div key={m.id} className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 flex justify-between items-center">
+                                                            <div className="flex flex-col gap-1">
+                                                                <div className="text-xs text-blue-400 font-bold">Match {i + 1}</div>
+                                                                <div className="font-bold text-white">{tTeamA?.name} <span className="text-neutral-500">vs</span> {tTeamB?.name}</div>
+                                                            </div>
+                                                            <div className="text-xs text-neutral-500 bg-neutral-800 px-2 py-1 rounded">
+                                                                Scheduled
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )
+                                    )}
+
+                                    {/* Local: COMPLETED */}
+                                    {activeSubTab === 'completed' && (
+                                        matchHistory.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-12 text-neutral-500">
+                                                <div className="bg-neutral-900 p-4 rounded-full mb-4 opacity-50"><Clock size={24} /></div>
+                                                <p className="text-sm">No completed matches yet.</p>
+                                                <p className="text-xs mt-2">Finish a match to see results here.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {matchHistory.map(m => (
+                                                    <div
+                                                        key={m.id}
+                                                        onClick={() => { setSelectedMatch(m); setGameState("history"); setViewMode("match"); }}
+                                                        className="bg-neutral-900/50 border border-neutral-800 rounded-xl p-4 cursor-pointer hover:bg-neutral-800 hover:border-neutral-700 transition-all group"
+                                                    >
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <div className="text-[10px] font-bold text-neutral-500 uppercase">{m.date}</div>
+                                                            <div className="text-[10px] font-bold text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">RESULT</div>
+                                                        </div>
+                                                        <div className="flex justify-between items-center mb-2">
+                                                            <div className="font-bold text-base text-white group-hover:text-blue-400 transition-colors">
+                                                                {typeof m.teamA === 'string' ? m.teamA : m.teamA.name} <span className="text-neutral-600 mx-1">vs</span> {typeof m.teamB === 'string' ? m.teamB : m.teamB.name}
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-xs text-neutral-400 font-mono bg-black/20 p-2 rounded-lg truncate">
+                                                            {m.result}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )
+                                    )}
+                                </>
+                            )}
+                        </motion.div>
+                    </AnimatePresence>
                 </div>
                 {/* Global Match Details Modal */}
                 {selectedGlobalMatch && (
