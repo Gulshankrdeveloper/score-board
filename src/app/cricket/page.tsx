@@ -858,6 +858,15 @@ export default function CricketPage() {
                     {/* GLOBAL MATCHES TAB */}
                     {activeTab === 'global' && (
                         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            {/* Demo Data Warning */}
+                            {globalMatches.some(m => m.isMock) && (
+                                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2 flex items-center justify-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse"></div>
+                                    <div className="text-[10px] font-bold text-yellow-500 uppercase tracking-widest text-center">
+                                        Demo Data • Add API Key for Real Matches
+                                    </div>
+                                </div>
+                            )}
                             {globalMatches.map(match => (
                                 <div key={match.id} className="bg-[#0f0f0f] border border-neutral-800 rounded-2xl p-5 shadow-lg relative overflow-hidden group">
                                     {match.status === 'Live' && (

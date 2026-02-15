@@ -1,16 +1,19 @@
 
+const API_KEY = "YOUR_API_KEY_HERE"; // Get free key from cricketdata.org or cricapi.com
+
 export type ApiMatch = {
     id: string;
     teamA: string;
     teamAImage?: string;
     teamB: string;
     teamBImage?: string;
-    scoreA: string; // e.g., "145/3 (18.2)"
-    scoreB: string; // e.g., "Yet to bat"
-    status: string; // "Live", "Completed", "Upcoming"
-    textStatus: string; // "India need 20 runs in 10 balls"
-    series: string; // e.g., "ICC World Cup"
+    scoreA: string;
+    scoreB: string;
+    status: string;
+    textStatus: string;
+    series: string;
     startTime?: string;
+    isMock?: boolean;
 };
 
 const MOCK_MATCHES: ApiMatch[] = [
@@ -23,6 +26,7 @@ const MOCK_MATCHES: ApiMatch[] = [
         status: 'Live',
         textStatus: 'Australia need 144 runs to win',
         series: 'ODI Series',
+        isMock: true
     },
     {
         id: 'm2',
@@ -33,7 +37,8 @@ const MOCK_MATCHES: ApiMatch[] = [
         status: 'Upcoming',
         textStatus: 'Match starts at 2:00 PM',
         series: 'T20 World Cup',
-        startTime: 'Tomorrow, 2:00 PM'
+        startTime: 'Tomorrow, 2:00 PM',
+        isMock: true
     },
     {
         id: 'm3',
@@ -43,12 +48,46 @@ const MOCK_MATCHES: ApiMatch[] = [
         scoreB: '193/5 (19.4)',
         status: 'Completed',
         textStatus: 'Mumbai Indians won by 5 wickets',
-        series: 'IPL League Match'
+        series: 'IPL League Match',
+        isMock: true
     }
 ];
 
 export const fetchLiveMatches = async (): Promise<ApiMatch[]> => {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    return MOCK_MATCHES;
+    if (API_KEY === "YOUR_API_KEY_HERE") {
+        console.warn("Using Mock Data. Add API_KEY in src/services/cricket-api.ts to fetch real data.");
+        await new Promise(resolve => setTimeout(resolve, 800)); // Simulate network
+        return MOCK_MATCHES;
+    }
+
+    try {
+        const response = await fetch(`https://api.cricapi.com/v1/currentMatches?apikey=${API_KEY}&offset=0`);
+        const data = await response.json();
+
+        if (data.status !== "success" || !data.data) {
+            console.error("API Error:", data);
+            return MOCK_MATCHES;
+        }
+
+        // Map API response to our app's format
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return data.data.map((match: any) => ({
+            id: match.id,
+            teamA: match.teams[0],
+            teamB: match.teams[1],
+            teamAImage: match.teamInfo?.[0]?.img,
+            teamBImage: match.teamInfo?.[1]?.img,
+            scoreA: "", // Complex parsing needed for scores usually, keeping simple for now
+            scoreB: "",
+            status: match.matchEnded ? "Completed" : "Live",
+            textStatus: match.status,
+            series: match.name,
+            startTime: match.dateTimeGMT,
+            isMock: false
+        }));
+
+    } catch (error) {
+        console.error("Failed to fetch matches:", error);
+        return MOCK_MATCHES;
+    }
 };
