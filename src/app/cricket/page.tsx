@@ -113,23 +113,32 @@ const ActionButton = ({ onClick, label, color = "bg-blue-600", disabled = false 
     </motion.button>
 );
 
+import LoginModal from "@/components/LoginModal";
+
 export default function CricketPage() {
     // --- Game Config State ---
     const [gameState, setGameState] = useState<GameState>("setup");
 
     // --- Role & Flow State ---
     const [userRole, setUserRole] = useState<UserRole>(null);
+    const [showLoginModal, setShowLoginModal] = useState(false);
     const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
 
     const handleRoleSelect = (role: UserRole) => {
-        setUserRole(role);
         if (role === 'scorer') {
-            setIsAdmin(true);
-            setViewMode('match');
+            setShowLoginModal(true);
         } else {
+            setUserRole('viewer');
             setIsAdmin(false);
             setViewMode('dashboard');
         }
+    };
+
+    const handleAdminLogin = () => {
+        setUserRole('scorer');
+        setIsAdmin(true);
+        setViewMode('match');
+        setShowLoginModal(false);
     };
 
 
@@ -824,6 +833,12 @@ export default function CricketPage() {
                         </div>
                     </button>
                 </div>
+
+                <LoginModal
+                    isOpen={showLoginModal}
+                    onClose={() => setShowLoginModal(false)}
+                    onLogin={handleAdminLogin}
+                />
             </div>
         );
     }
