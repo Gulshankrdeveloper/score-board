@@ -1,5 +1,6 @@
 
-const API_KEY = "YOUR_API_KEY_HERE"; // Get free key from cricketdata.org or cricapi.com
+
+const API_KEY = "1b20d0ac-58df-4963-bcae-e45844cc0c84"; // Get free key from cricketdata.org or cricapi.com
 
 export type ApiMatch = {
     id: string;
@@ -54,11 +55,7 @@ const MOCK_MATCHES: ApiMatch[] = [
 ];
 
 export const fetchLiveMatches = async (): Promise<ApiMatch[]> => {
-    if (API_KEY === "YOUR_API_KEY_HERE") {
-        console.warn("Using Mock Data. Add API_KEY in src/services/cricket-api.ts to fetch real data.");
-        await new Promise(resolve => setTimeout(resolve, 800)); // Simulate network
-        return MOCK_MATCHES;
-    }
+
 
     try {
         const response = await fetch(`https://api.cricapi.com/v1/currentMatches?apikey=${API_KEY}&offset=0`);
