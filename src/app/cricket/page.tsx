@@ -230,14 +230,20 @@ export default function CricketPage() {
 
     // --- Persistence ---
     useEffect(() => {
-        const savedHistory = localStorage.getItem('cricket_history');
-        if (savedHistory) setMatchHistory(JSON.parse(savedHistory));
+        try {
+            const savedHistory = localStorage.getItem('cricket_history');
+            if (savedHistory) setMatchHistory(JSON.parse(savedHistory) || []);
+        } catch (e) { console.error("History parse error", e); }
 
-        const savedTournTeams = localStorage.getItem('cricket_tournament_teams');
-        if (savedTournTeams) setTournamentTeams(JSON.parse(savedTournTeams));
+        try {
+            const savedTournTeams = localStorage.getItem('cricket_tournament_teams');
+            if (savedTournTeams) setTournamentTeams(JSON.parse(savedTournTeams) || []);
+        } catch (e) { console.error("Teams parse error", e); }
 
-        const savedTournMatches = localStorage.getItem('cricket_tournament_matches');
-        if (savedTournMatches) setTournamentMatches(JSON.parse(savedTournMatches));
+        try {
+            const savedTournMatches = localStorage.getItem('cricket_tournament_matches');
+            if (savedTournMatches) setTournamentMatches(JSON.parse(savedTournMatches) || []);
+        } catch (e) { console.error("Matches parse error", e); }
 
         // Restore active match if any
         const savedActiveMatchId = localStorage.getItem('cricket_active_tournament_match');
@@ -512,6 +518,12 @@ export default function CricketPage() {
     };
 
     const generateKnockouts = () => {
+        // Defensive Check
+        if (!tournamentMatches || !Array.isArray(tournamentMatches)) {
+            console.error("No tournament matches found");
+            return;
+        }
+
         // 1. Check if Group Stage is complete
         const groupMatches = tournamentMatches.filter(m => !m.stage || m.stage === 'Group');
         if (groupMatches.some(m => !m.completed)) {
@@ -1853,6 +1865,12 @@ export default function CricketPage() {
     if (gameState === "tournament-dashboard") {
         const [activeGroup, setActiveGroup] = useState('All'); // State for active group filter
 
+        // Defensive check for teams
+        if (!Array.isArray(tournamentTeams)) {
+            setTournamentTeams([]);
+            return null;
+        }
+
         const allGroups = Array.from(new Set(tournamentTeams.map(t => t.group || "A"))).sort();
         const teamsInActiveGroup = tournamentTeams.filter(t => activeGroup === 'All' || (t.group || "A") === activeGroup);
 
@@ -1916,7 +1934,7 @@ export default function CricketPage() {
                                                 <td className="p-3 text-right font-mono text-neutral-300">{team.played}</td>
                                                 <td className="p-3 text-right font-mono text-green-400 hidden sm:table-cell">{team.won}</td>
                                                 <td className="p-3 text-right font-mono text-red-400 hidden sm:table-cell">{team.lost}</td>
-                                                <td className="p-3 text-right font-mono text-neutral-400 hidden sm:table-cell">{team.nrr ? team.nrr.toFixed(3) : "0.000"}</td>
+                                                <td className="p-3 text-right font-mono text-neutral-400 hidden sm:table-cell">{(team.nrr || 0).toFixed(3)}</td>
                                                 <td className="p-3 text-right font-bold text-blue-400">{team.points}</td>
                                             </tr>
                                         ))}
@@ -1940,7 +1958,7 @@ export default function CricketPage() {
                     <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6">
                         <h3 className="text-lg font-bold mb-4 text-green-400">Match Schedule</h3>
                         <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                            {tournamentMatches.map((m, i) => {
+                            {(tournamentMatches || []).map((m, i) => {
                                 const teamA = tournamentTeams.find(t => t.id === m.teamAId);
                                 const teamB = tournamentTeams.find(t => t.id === m.teamBId);
                                 return (
@@ -1971,9 +1989,10 @@ export default function CricketPage() {
                     {/* Knockout Stage Section */}
                     <div className="md:col-span-2 flex flex-col gap-6">
                         {/* Generate Button (Only if Group Stage Done & No Knockouts yet) */}
-                        {tournamentMatches.length > 0 &&
-                            tournamentMatches.filter(m => !m.stage || m.stage === 'Group').every(m => m.completed) &&
-                            !tournamentMatches.some(m => m.stage && m.stage !== 'Group') && (
+                        {/* Generate Button (Only if Group Stage Done & No Knockouts yet) */}
+                        {(tournamentMatches || []).length > 0 &&
+                            (tournamentMatches || []).filter(m => !m.stage || m.stage === 'Group').every(m => m.completed) &&
+                            !(tournamentMatches || []).some(m => m.stage && m.stage !== 'Group') && (
                                 <div className="flex justify-center">
                                     <button
                                         onClick={generateKnockouts}
@@ -1985,7 +2004,7 @@ export default function CricketPage() {
                             )}
 
                         {/* Bracket Display */}
-                        {tournamentMatches.some(m => m.stage && m.stage !== 'Group') && (
+                        {(tournamentMatches || []).some(m => m.stage && m.stage !== 'Group') && (
                             <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6">
                                 <h3 className="text-xl font-bold mb-6 text-orange-500 flex items-center gap-2">
                                     <Trophy size={20} /> Knockout Bracket
@@ -1994,7 +2013,7 @@ export default function CricketPage() {
                                     {/* Semi Finals */}
                                     <div className="space-y-4">
                                         <h4 className="text-sm font-bold text-neutral-500 uppercase tracking-widest text-center mb-2">Semi-Finals</h4>
-                                        {tournamentMatches.filter(m => m.stage === 'Semi-Final').map(m => {
+                                        {(tournamentMatches || []).filter(m => m.stage === 'Semi-Final').map(m => {
                                             const tA = tournamentTeams.find(t => t.id === m.teamAId);
                                             const tB = tournamentTeams.find(t => t.id === m.teamBId);
                                             return (
@@ -2021,7 +2040,7 @@ export default function CricketPage() {
                                         <div className="hidden md:block absolute left-0 top-1/2 -translate-x-4 w-4 h-full border-l-2 border-dashed border-neutral-700 -translate-y-1/2"></div>
 
                                         <h4 className="text-sm font-bold text-neutral-500 uppercase tracking-widest text-center mb-2">Grand Final</h4>
-                                        {tournamentMatches.filter(m => m.stage === 'Final').map(m => {
+                                        {(tournamentMatches || []).filter(m => m.stage === 'Final').map(m => {
                                             const tA = tournamentTeams.find(t => t.id === m.teamAId);
                                             const tB = tournamentTeams.find(t => t.id === m.teamBId);
                                             return (
