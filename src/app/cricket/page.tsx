@@ -73,7 +73,7 @@ type TournamentMatch = {
     winnerId: string | null;
     completed: boolean;
     result: string;
-    result: string;
+
     matchDate: string;
     stage: 'Group' | 'Semi-Final' | 'Final';
 };
@@ -1001,7 +1001,7 @@ export default function CricketPage() {
             runs: runs,
             isWicket: isWicket,
             isBoundary: runVal === 4 || runVal === 6,
-            isBoundary: runVal === 4 || runVal === 6,
+
             timestamp: Date.now(),
             shotCoordinates: shotCoordinates
         };
