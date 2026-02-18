@@ -9,6 +9,11 @@ import { cn } from "@/lib/utils";
 
 
 import { fetchLiveMatches, fetchMatchScorecard, ApiMatch, ApiMatchScorecard } from "@/services/cricket-api";
+import { MatchSummaryCard } from "@/components/MatchSummaryCard";
+import { useAudioCommentary } from "@/hooks/useAudioCommentary";
+import { toPng } from 'html-to-image';
+import { useRef } from "react";
+import { Share2, Download, Volume2, VolumeX } from "lucide-react";
 
 // --- Types ---
 type Player = {
@@ -53,7 +58,7 @@ type TournamentTeam = {
     won: number;
     lost: number;
     points: number;
-    nrr: number; // Net Run Rate (simplified or full)
+    nrr: number;
     runsScored: number;
     oversFaced: number;
     runsConceded: number;
@@ -228,6 +233,30 @@ export default function CricketPage() {
     const [tempPlayerNameA, setTempPlayerNameA] = useState(""); // For input
     const [tempPlayerNameB, setTempPlayerNameB] = useState(""); // For input
     const [battingTeam, setBattingTeam] = useState<"A" | "B">("A");
+
+    const [showSummaryModal, setShowSummaryModal] = useState(false);
+    const summaryCardRef = useRef<HTMLDivElement>(null);
+    const { speak, isMuted, toggleMute } = useAudioCommentary();
+
+    // --- Match Conclusion State ---
+    const [showMatchResultModal, setShowMatchResultModal] = useState(false);
+    const [matchResultText, setMatchResultText] = useState("");
+
+    const handleDownloadSummary = async () => {
+        if (summaryCardRef.current === null) {
+            return;
+        }
+
+        try {
+            const dataUrl = await toPng(summaryCardRef.current, { cacheBust: true, });
+            const link = document.createElement('a');
+            link.download = `match-summary-${Date.now()}.png`;
+            link.href = dataUrl;
+            link.click();
+        } catch (err) {
+            console.error(err);
+        }
+    };
 
     // --- Match State ---
     const [teamA, setTeamA] = useState<Team>({ name: "Team A", players: [] });
@@ -440,7 +469,7 @@ export default function CricketPage() {
                 // If innings 1 ends and we manual save?
                 // Let's rely on whoever is "currentBattingTeam" winning? No.
                 // We need a proper Winner determination logic in saveMatch.
-                // For now, let's assume the user clicks "End Match" when it's done. 
+                // For now, let's assume the user clicks "End Match" when it's done.
                 // If it's a chase win, batting team wins.
                 // If it's a defend win, bowling team wins.
                 // Simplified: Ask user who won? Or detect score.
@@ -453,43 +482,52 @@ export default function CricketPage() {
                 // Let's do simple logic: If target chased -> Batting wins. Else Bowling wins.
                 if (innings === 2 && targetRuns && totalRuns >= targetRuns) {
                     winnerId = currentBattingTeam.name === teamA.name ? match.teamAId : match.teamBId;
-                } else if (innings === 2) { // Defended
-                    winnerId = currentBowlingTeam.name === teamA.name ? match.teamAId : match.teamBId;
                 } else {
-                    // Innings 1 end? Can't really determine winner unless D/L or forfeit.
-                    // Assuming simple flow: Only save completed match.
-                    // Determine winner based on scores if innings 1 and 2 done?
-                    // Complexity: This `saveMatch` is called manually.
-                    // Let's assume the USER ensures the match is over.
-                    // We will assume current Batting team WON if they have more runs than target.
-                    // Otherwise Bowling team won.
-                    if (targetRuns && totalRuns >= targetRuns) {
-                        winnerId = currentBattingTeam.name === teamA.name ? match.teamAId : match.teamBId;
-                    } else {
-                        winnerId = currentBowlingTeam.name === teamA.name ? match.teamAId : match.teamBId;
-                    }
+                    winnerId = currentBowlingTeam.name === teamA.name ? match.teamAId : match.teamBId;
                 }
 
                 match.winnerId = winnerId;
                 match.result = winnerId === match.teamAId ? `${teamA.name} Won` : `${teamB.name} Won`;
                 setTournamentMatches(updatedMatches);
 
-                // Update Stats
-                const updatedTeams = tournamentTeams.map(t => {
-                    if (t.id === match.teamAId || t.id === match.teamBId) {
-                        const isWinner = t.id === winnerId;
-                        return {
-                            ...t,
-                            played: t.played + 1,
-                            won: t.won + (isWinner ? 1 : 0),
-                            lost: t.lost + (isWinner ? 0 : 1),
-                            points: t.points + (isWinner ? 2 : 0)
-                            // NRR logic omitted for brevity in this step
-                        };
+                // Update Points Table
+                const winner = winnerId === match.teamAId ? 'A' : 'B'; // Determine winner based on match.winnerId
+                const winnerTeamName = winner === 'A' ? teamA.name : teamB.name; // Storing Name for simplicity in history, but ID for tourney
+                // Note: In tourney mode, we need IDs. For now, assuming names map to IDs or we use names.
+                // Better: Find team objects in tournamentTeams
+
+                if (activeTournamentMatchId) { // If tournament is active
+                    const teamAObj = tournamentTeams.find(t => t.id === match.teamAId);
+                    const teamBObj = tournamentTeams.find(t => t.id === match.teamBId);
+
+                    if (teamAObj && teamBObj) {
+                        // Update Stats for NRR
+                        // This is complex to track perfectly without full match state.
+                        // Simplified: We update simply based on this match result if we had full 2nd innings score.
+                        // For now, let's just update Runs Scored and Overs Faced for the Batting Team.
+                        // And Runs Conceded and Overs Bowled for the Bowling Team.
+
+                        // But wait, this is only ONE innings. A match has 2 innings.
+                        // We need to handle this ONLY at the END of the match.
+                        // Ideally, we persist specific match stats.
+                        // Simplified NRR for this prototype:
+                        // Just += points.
                     }
-                    return t;
-                });
-                setTournamentTeams(updatedTeams);
+
+                    const updatedTeams = tournamentTeams.map(team => {
+                        if (team.id === winnerId) {
+                            return { ...team, played: team.played + 1, won: team.won + 1, points: team.points + 2 };
+                        } else if (team.id === match.teamAId || team.id === match.teamBId) {
+                            // This team played but didn't win
+                            return { ...team, played: team.played + 1, lost: team.lost + 1 };
+                        }
+                        return team;
+                    });
+
+                    // Recalculate NRR if we had the data.
+                    // For now, sticking to Points.
+                    setTournamentTeams(updatedTeams);
+                }
                 setActiveTournamentMatchId(null);
                 setGameState("tournament-dashboard");
                 return; // Exit, don't go to setup
@@ -662,13 +700,29 @@ export default function CricketPage() {
             runVal = runs;
             updateBatsmanScore(runs);
             updateBowlerStats(runs, false, true);
-            if (runs === 4) setCelebration("4");
-            if (runs === 6) setCelebration("6");
+            if (runs === 4) {
+                setCelebration("4");
+                speak("Four runs! Magnificent shot!");
+            }
+            if (runs === 6) {
+                setCelebration("6");
+                speak("Six runs! That is huge!");
+            }
+            if (runs === 0) {
+                speak("No run.");
+            } else if (runs === 1) {
+                speak("Single.");
+            } else if (runs === 2) {
+                speak("Two runs.");
+            } else if (runs === 3) {
+                speak("Three runs.");
+            }
         } else {
             // Specials
             if (runs === "W") { // Wicket
                 isWicket = true;
                 setCelebration("W");
+                speak("Wicket! What a delivery!");
                 setTotalWickets(w => w + 1);
                 updateBatsmanScore(0); // Ball faced, 0 runs
                 markStrikerOut();
@@ -678,9 +732,11 @@ export default function CricketPage() {
                     shouldEndInnings = true;
                     if (innings === 1) {
                         setTimeout(startInningsBreak, 2000);
+                        speak("All out! End of first innings.");
                     } else {
                         // End Match logic here if needed, currently manual "End Match"
                         alert("All Out! End of Match.");
+                        speak("All out! End of match.");
                     }
                 } else {
                     // Delay showing batsman selection until animation is done
@@ -694,6 +750,7 @@ export default function CricketPage() {
                 runVal = 1;
                 setExtras(prev => ({ ...prev, [runs === "WD" ? "w" : "nb"]: prev[runs === "WD" ? "w" : "nb"] + 1 }));
                 updateBowlerStats(1, false, false); // Extra run charged to bowler usually
+                speak(runs === "WD" ? "Wide ball!" : "No ball!");
             }
         }
 
@@ -711,7 +768,10 @@ export default function CricketPage() {
 
             // Target Chased Check (Innings 2)
             if (innings === 2 && targetRuns && (totalRuns + runVal) >= targetRuns) {
-                alert(`Match Won by ${currentBattingTeam.name}!`);
+                const resultMsg = `Match Won by ${currentBattingTeam.name}!`;
+                speak(`${currentBattingTeam.name} won the match!`);
+                setMatchResultText(resultMsg);
+                setShowMatchResultModal(true);
                 return;
             }
 
@@ -722,9 +782,13 @@ export default function CricketPage() {
                 if (nextOvers >= totalOvers) {
                     if (innings === 1) {
                         setTimeout(startInningsBreak, 2000);
+                        speak("End of first innings!");
                         return;
                     } else {
-                        alert("Innings Complete! End of Match.");
+                        const resultMsg = "Innings Complete! End of Match.";
+                        speak("End of match!");
+                        setMatchResultText(resultMsg);
+                        setShowMatchResultModal(true);
                         // Could auto end match here
                     }
                 }
@@ -739,6 +803,8 @@ export default function CricketPage() {
                     setThisOverRuns(0);
                     setLastOverBowlerId(bowlerId);
                     setBowlerId(null);
+
+                    speak(`End of over. ${currentBattingTeam.name} score is ${totalRuns} for ${totalWickets}.`);
 
                     // 3. ALWAYS swap ends at end of over (regardless of last ball run)
                     // But wait, if we swapped above (odd run), doing it again here cancels it out?
@@ -772,7 +838,7 @@ export default function CricketPage() {
 
         setStrikerId(prevStriker => {
             setNonStrikerId(prevNonStriker => prevStriker);
-            return nonStrikerId; // Use the value from render scope or we need a Ref. 
+            return nonStrikerId; // Use the value from render scope or we need a Ref.
             // Actually, if we use functional setNonStrikerId, we have access to current NonStriker.
             // But we can't return it to setStrikerId easily.
         });
@@ -1296,7 +1362,7 @@ export default function CricketPage() {
                         </div>
                         <div className="md:hidden mb-4">
                             <button onClick={() => setGameState("tournament-setup")} className="w-full py-2 bg-gradient-to-r from-yellow-600 to-orange-600 rounded-lg font-bold text-sm">
-                                ðŸ† Tournament Mode
+                                🏆 Tournament Mode
                             </button>
                         </div>
                         <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
@@ -1372,7 +1438,7 @@ export default function CricketPage() {
 
                 {!activeTournamentMatchId && (
                     <button onClick={() => setGameState("tournament-setup")} className="text-sm text-yellow-500 hover:text-yellow-400 font-bold flex items-center gap-2 mt-8 border border-yellow-500/30 px-4 py-2 rounded-full hover:bg-yellow-500/10 transition-colors">
-                        ðŸ† Switch to Tournament Mode
+                        🏆 Switch to Tournament Mode
                     </button>
                 )}
 
@@ -1458,6 +1524,11 @@ export default function CricketPage() {
     }
 
     if (gameState === "tournament-dashboard") {
+        const [activeGroup, setActiveGroup] = useState('All'); // State for active group filter
+
+        const allGroups = Array.from(new Set(tournamentTeams.map(t => t.group || "A"))).sort();
+        const teamsInActiveGroup = tournamentTeams.filter(t => activeGroup === 'All' || (t.group || "A") === activeGroup);
+
         return (
             <div className="min-h-screen bg-neutral-950 text-white p-4 md:p-8 flex flex-col items-center max-w-5xl mx-auto">
                 <div className="w-full flex justify-between items-center mb-8 border-b border-neutral-800 pb-4">
@@ -1468,46 +1539,66 @@ export default function CricketPage() {
 
                 <div className="grid md:grid-cols-2 gap-8 w-full">
                     {/* Points Table */}
-                    {/* Points Table - Grouped */}
                     <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 max-h-[500px] overflow-y-auto">
-                        <h3 className="text-lg font-bold mb-4 text-blue-400">Points Tables</h3>
-                        {Array.from(new Set(tournamentTeams.map(t => t.group || "A"))).sort().map(group => (
-                            <div key={group} className="mb-8 last:mb-0">
-                                <h4 className="text-md font-bold mb-2 text-yellow-500 bg-neutral-800 px-3 py-1 rounded inline-block">Group {group}</h4>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm text-left">
-                                        <thead className="bg-neutral-800 text-neutral-400">
-                                            <tr>
-                                                <th className="p-2">Team</th>
-                                                <th className="p-2 text-center">P</th>
-                                                <th className="p-2 text-center">W</th>
-                                                <th className="p-2 text-center">L</th>
-                                                <th className="p-2 text-center font-bold text-white">Pts</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-neutral-800">
-                                            {tournamentTeams
-                                                .filter(t => (t.group || "A") === group)
-                                                .sort((a, b) => b.points - a.points)
-                                                .map((t, i) => (
-                                                    <tr key={t.id} className="hover:bg-neutral-800/30">
-                                                        <td className="p-2 font-medium flex items-center gap-2">
-                                                            <span className="text-neutral-500 w-4">{i + 1}.</span> {t.name}
-                                                        </td>
-                                                        <td className="p-2 text-center text-neutral-400">{t.played}</td>
-                                                        <td className="p-2 text-center text-green-400">{t.won}</td>
-                                                        <td className="p-2 text-center text-red-400">{t.lost}</td>
-                                                        <td className="p-2 text-center font-bold text-yellow-400">{t.points}</td>
-                                                    </tr>
-                                                ))}
-                                        </tbody>
-                                    </table>
-                                    {tournamentTeams.filter(t => (t.group || "A") === group).length === 0 && (
-                                        <div className="text-center text-neutral-500 italic py-2">No teams in this group.</div>
-                                    )}
-                                </div>
+                        <h3 className="text-lg font-bold mb-4 text-blue-400">Points Table</h3>
+
+                        {/* Group Filter */}
+                        {allGroups.length > 1 && (
+                            <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                                <button
+                                    onClick={() => setActiveGroup('All')}
+                                    className={cn("px-3 py-1 rounded-full text-xs font-bold", activeGroup === 'All' ? "bg-blue-600 text-white" : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700")}
+                                >
+                                    All Groups
+                                </button>
+                                {allGroups.map(group => (
+                                    <button
+                                        key={group}
+                                        onClick={() => setActiveGroup(group)}
+                                        className={cn("px-3 py-1 rounded-full text-xs font-bold", activeGroup === group ? "bg-blue-600 text-white" : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700")}
+                                    >
+                                        Group {group}
+                                    </button>
+                                ))}
                             </div>
-                        ))}
+                        )}
+
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-neutral-800 text-neutral-400">
+                                    <tr>
+                                        <th className="p-3">#</th>
+                                        <th className="p-3">Team</th>
+                                        <th className="p-3 text-right">P</th>
+                                        <th className="p-3 text-right hidden sm:table-cell">W</th>
+                                        <th className="p-3 text-right hidden sm:table-cell">L</th>
+                                        <th className="p-3 text-right hidden sm:table-cell">NRR</th>
+                                        <th className="p-3 text-right">Pts</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-neutral-800">
+                                    {teamsInActiveGroup
+                                        .sort((a, b) => b.points - a.points || b.nrr - a.nrr)
+                                        .map((team, index) => (
+                                            <tr key={team.id} className="border-t border-neutral-800 hover:bg-neutral-800/50 transition-colors">
+                                                <td className="p-3 font-mono text-neutral-500">{(index + 1).toString().padStart(2, '0')}</td>
+                                                <td className="p-3 font-bold text-white flex items-center gap-2">
+                                                    {team.name}
+                                                    {index < 2 && <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">Q</span>}
+                                                </td>
+                                                <td className="p-3 text-right font-mono text-neutral-300">{team.played}</td>
+                                                <td className="p-3 text-right font-mono text-green-400 hidden sm:table-cell">{team.won}</td>
+                                                <td className="p-3 text-right font-mono text-red-400 hidden sm:table-cell">{team.lost}</td>
+                                                <td className="p-3 text-right font-mono text-neutral-400 hidden sm:table-cell">{team.nrr ? team.nrr.toFixed(3) : "0.000"}</td>
+                                                <td className="p-3 text-right font-bold text-blue-400">{team.points}</td>
+                                            </tr>
+                                        ))}
+                                    {teamsInActiveGroup.length === 0 && (
+                                        <tr><td colSpan={7} className="p-4 text-center text-neutral-500 italic">No teams in this group.</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
                     {/* Schedule */}
@@ -1550,9 +1641,11 @@ export default function CricketPage() {
     if (gameState === "history") {
         if (selectedMatch) {
             // Detailed Scorecard View
-            // Detailed Scorecard View
             // No longer deriving 'battingTeam' and 'bowlingTeam' like before.
             // We now display full stats for selectedMatch.teamA and selectedMatch.teamB
+
+            const winner = selectedMatch.result.includes(selectedMatch.teamA.name) ? 'A' : 'B';
+            const currentMatchRecord = selectedMatch; // For summary card
 
             return (
                 <div className="min-h-screen bg-neutral-950 text-white p-4 md:p-8 flex flex-col items-center max-w-4xl mx-auto">
@@ -1739,6 +1832,38 @@ export default function CricketPage() {
                             </div>
                         </div>
                     </div>
+                    <div className="w-full flex gap-3 mt-6">
+                        <button onClick={() => { setMatchHistory([...matchHistory, currentMatchRecord!]); setGameState("setup"); }} className="flex-1 bg-neutral-800 hover:bg-neutral-700 py-3 rounded-xl font-bold transition-all">
+                            New Match
+                        </button>
+                        <button onClick={() => setShowSummaryModal(true)} className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2">
+                            <Share2 size={18} /> Share Summary
+                        </button>
+                    </div>
+
+                    {/* Share Summary Modal */}
+                    {showSummaryModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
+                            <div className="flex flex-col items-center gap-4">
+                                <MatchSummaryCard
+                                    ref={summaryCardRef}
+                                    winnerTeam={winner === 'A' ? teamA.name : teamB.name}
+                                    teamA={{ name: selectedMatch.teamA.name, score: `${selectedMatch.teamA.players.reduce((acc, p) => acc + p.runs, 0)}/${selectedMatch.teamA.players.filter(p => p.out).length}`, overs: `${selectedMatch.overs}` }} // Using current state as snapshot
+                                    teamB={{ name: selectedMatch.teamB.name, score: `${selectedMatch.teamB.players.reduce((acc, p) => acc + p.runs, 0)}/${selectedMatch.teamB.players.filter(p => p.out).length}`, overs: `${selectedMatch.overs}` }} // Placeholder, ideally we have full match state
+                                    result={selectedMatch.result}
+                                    date={selectedMatch.date}
+                                />
+                                <div className="flex gap-4">
+                                    <button onClick={handleDownloadSummary} className="px-6 py-3 bg-green-600 rounded-full font-bold flex items-center gap-2 hover:scale-105 transition-transform">
+                                        <Download size={20} /> Download Image
+                                    </button>
+                                    <button onClick={() => setShowSummaryModal(false)} className="px-6 py-3 bg-neutral-800 rounded-full font-bold hover:bg-neutral-700 transition-colors">
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
@@ -1852,13 +1977,30 @@ export default function CricketPage() {
             <div className="w-full bg-[#111] border-b border-[#333] shadow-md z-20 shrink-0">
                 {/* Top Bar: Nav */}
                 <div className="flex justify-between items-center px-4 py-2 border-b border-[#222]">
-                    <button onClick={() => userRole === 'viewer' ? setViewMode('dashboard') : setUserRole(null)} className="flex items-center gap-1 text-neutral-400 hover:text-white transition-colors text-sm font-medium">
+                    <button
+                        onClick={() => {
+                            if (userRole === 'viewer') {
+                                setViewMode('dashboard');
+                            } else {
+                                // Scorer Exit Logic
+                                const confirmExit = window.confirm("Do you want to end this match and return to setup?");
+                                if (confirmExit) {
+                                    setGameState("setup");
+                                    setUserRole(null);
+                                }
+                            }
+                        }}
+                        className="flex items-center gap-1 text-neutral-400 hover:text-white transition-colors text-sm font-medium"
+                    >
                         <ChevronLeft size={16} /> {userRole === 'viewer' ? 'Dashboard' : 'Exit'}
                     </button>
                     <div className="text-xs font-bold text-neutral-500 uppercase tracking-widest">
                         Match • {innings === 1 ? "1st Innings" : "2nd Innings"}
                     </div>
-                    <div className="flex bg-neutral-800 rounded-lg p-0.5">
+                    <div className="flex bg-neutral-800 rounded-lg p-0.5 items-center gap-1">
+                        <button onClick={toggleMute} className="p-1.5 rounded-md hover:bg-neutral-700 transition-colors">
+                            {isMuted ? <VolumeX size={14} className="text-red-400" /> : <Volume2 size={14} className="text-green-400" />}
+                        </button>
                         {isAdmin && (
                             <button onClick={() => setIsAdmin(!isAdmin)} className="p-1.5 rounded-md hover:bg-neutral-700 transition-colors">
                                 <Settings size={14} className="text-neutral-400" />
@@ -2134,6 +2276,52 @@ export default function CricketPage() {
                                 {currentBattingTeam.players.filter(p => !p.out).length === 2 && ( // Only 2 players left (already selected)
                                     <div className="p-4 text-center text-neutral-500 italic">No more players available</div>
                                 )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Match Result Modal */}
+                {showMatchResultModal && (
+                    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md animate-in fade-in zoom-in duration-300">
+                        <div className="bg-[#1a1a1a] border border-[#333] rounded-2xl w-full max-w-sm p-6 text-center shadow-2xl relative overflow-hidden">
+                            {/* Confetti Effect (Simple CSS or just visual) */}
+                            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+
+                            <div className="mb-4 flex justify-center">
+                                <div className="p-3 bg-yellow-500/20 rounded-full animate-bounce">
+                                    <span className="text-4xl">🏆</span>
+                                </div>
+                            </div>
+
+                            <h2 className="text-2xl font-black text-white mb-2">Match Finished!</h2>
+                            <p className="text-lg text-blue-400 font-bold mb-6">{matchResultText}</p>
+
+                            <div className="space-y-3">
+                                <button
+                                    onClick={() => {
+                                        saveMatch();
+                                        setShowMatchResultModal(false);
+                                        // Reset State or go to History? 
+                                        // Creating a "Post Match" flow would be best, but for now:
+                                        // Let's trigger "Share Summary" immediately after saving?
+                                        // Or just go to history.
+                                        setGameState("history");
+                                        // Set selected match to the one just saved (newest)
+                                        // We need to wait for state update... tedious.
+                                        // Let's just go to setup for now as requested.
+                                        setGameState("setup");
+                                    }}
+                                    className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-green-500/20"
+                                >
+                                    Save & Exit
+                                </button>
+                                <button
+                                    onClick={() => setShowMatchResultModal(false)}
+                                    className="w-full py-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 font-bold rounded-xl transition-colors"
+                                >
+                                    Cancel (Correct Score)
+                                </button>
                             </div>
                         </div>
                     </div>
