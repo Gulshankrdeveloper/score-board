@@ -242,7 +242,12 @@ export default function CricketPage() {
 
         try {
             const savedTournTeams = localStorage.getItem('cricket_tournament_teams');
-            if (savedTournTeams) setTournamentTeams(JSON.parse(savedTournTeams) || []);
+            if (savedTournTeams) {
+                const parsed = JSON.parse(savedTournTeams);
+                if (Array.isArray(parsed)) {
+                    setTournamentTeams(parsed.filter((t: any) => t && t.id && t.name));
+                }
+            }
         } catch (e) { console.error("Teams parse error", e); }
 
         try {
@@ -553,7 +558,7 @@ export default function CricketPage() {
 
         // Group teams by group
         const groups: { [key: string]: TournamentTeam[] } = {};
-        tournamentTeams.forEach(t => {
+        tournamentTeams.filter(t => t && t.id).forEach(t => {
             const g = t.group || "A";
             if (!groups[g]) groups[g] = [];
             groups[g].push(t);
@@ -608,9 +613,10 @@ export default function CricketPage() {
         // Sort teams by Points, then NRR (using Runs/wickets logic effectively via points for now, or just Points)
         // Since we don't have full NRR, we rely on Points. If tie, we can use run quotient if we had it.
         // For now: Points > Won > Random/First
-        const sortedTeams = [...tournamentTeams].sort((a, b) => {
-            if (b.points !== a.points) return b.points - a.points;
-            if (b.won !== a.won) return b.won - a.won;
+        // For now: Points > Won > Random/First
+        const sortedTeams = [...tournamentTeams].filter(t => t && t.id).sort((a, b) => {
+            if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0);
+            if ((b.won || 0) !== (a.won || 0)) return (b.won || 0) - (a.won || 0);
             return 0;
         });
 
@@ -2063,7 +2069,8 @@ export default function CricketPage() {
                                 </thead>
                                 <tbody className="divide-y divide-neutral-800">
                                     {teamsInActiveGroup
-                                        .sort((a, b) => b.points - a.points || b.nrr - a.nrr)
+                                        .filter(team => team && team.id)
+                                        .sort((a, b) => (b.points || 0) - (a.points || 0) || (b.nrr || 0) - (a.nrr || 0))
                                         .map((team, index) => (
                                             <tr key={team.id} className="border-t border-neutral-800 hover:bg-neutral-800/50 transition-colors">
                                                 <td className="p-3 font-mono text-neutral-500">{(index + 1).toString().padStart(2, '0')}</td>
@@ -2071,11 +2078,11 @@ export default function CricketPage() {
                                                     {team.name}
                                                     {index < 2 && <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">Q</span>}
                                                 </td>
-                                                <td className="p-3 text-right font-mono text-neutral-300">{team.played}</td>
-                                                <td className="p-3 text-right font-mono text-green-400 hidden sm:table-cell">{team.won}</td>
-                                                <td className="p-3 text-right font-mono text-red-400 hidden sm:table-cell">{team.lost}</td>
+                                                <td className="p-3 text-right font-mono text-neutral-300">{team.played || 0}</td>
+                                                <td className="p-3 text-right font-mono text-green-400 hidden sm:table-cell">{team.won || 0}</td>
+                                                <td className="p-3 text-right font-mono text-red-400 hidden sm:table-cell">{team.lost || 0}</td>
                                                 <td className="p-3 text-right font-mono text-neutral-400 hidden sm:table-cell">{(team.nrr || 0).toFixed(3)}</td>
-                                                <td className="p-3 text-right font-bold text-blue-400">{team.points}</td>
+                                                <td className="p-3 text-right font-bold text-blue-400">{team.points || 0}</td>
                                             </tr>
                                         ))}
                                     {teamsInActiveGroup.length === 0 && (
