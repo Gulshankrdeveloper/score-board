@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Settings, RotateCcw, Monitor, UserPlus, Users, ArrowLeftRight, Play, Trash2, ChevronLeft, Bell, Calendar, Clock, X, Trophy } from "lucide-react";
+import { Settings, RotateCcw, Monitor, UserPlus, Users, ArrowLeftRight, Play, Trash2, ChevronLeft, Bell, Calendar, Clock, X, Trophy, User, Edit2 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +29,9 @@ type Player = {
         maidens: number;
         runs: number;
         wickets: number;
+        runsConceded: number;
     };
+    photoUrl?: string; // New: Player Photo
 };
 
 type Team = {
@@ -456,7 +458,7 @@ export default function CricketPage() {
         const createPlayer = (name: string) => ({
             id: Math.random().toString(36).substr(2, 9),
             name, runs: 0, balls: 0, fours: 0, sixes: 0, out: false,
-            bowling: { overs: 0, maidens: 0, runs: 0, wickets: 0 }
+            bowling: { overs: 0, maidens: 0, runs: 0, wickets: 0, runsConceded: 0 }
         });
 
         const newTeamA = Array.from({ length: 11 }, (_, i) => createPlayer(`Player A${i + 1}`));
@@ -464,6 +466,25 @@ export default function CricketPage() {
 
         setTeamA(prev => ({ ...prev, players: newTeamA }));
         setTeamB(prev => ({ ...prev, players: newTeamB }));
+    };
+
+    const updatePlayer = (team: "A" | "B", id: string, newName: string) => {
+        if (!newName.trim()) return;
+        const updater = (prev: Team) => ({
+            ...prev,
+            players: prev.players.map(p => p.id === id ? { ...p, name: newName.trim() } : p)
+        });
+        if (team === 'A') setTeamA(updater);
+        else setTeamB(updater);
+    };
+
+    const removePlayer = (team: "A" | "B", id: string) => {
+        const updater = (prev: Team) => ({
+            ...prev,
+            players: prev.players.filter(p => p.id !== id)
+        });
+        if (team === 'A') setTeamA(updater);
+        else setTeamB(updater);
     };
 
     const addPlayer = (team: "A" | "B", name: string) => {
@@ -478,7 +499,7 @@ export default function CricketPage() {
             id: Math.random().toString(36).substr(2, 9),
             name: name.trim(),
             runs: 0, balls: 0, fours: 0, sixes: 0, out: false,
-            bowling: { overs: 0, maidens: 0, runs: 0, wickets: 0 }
+            bowling: { overs: 0, maidens: 0, runs: 0, wickets: 0, runsConceded: 0 }
         };
 
         if (team === "A") {
@@ -655,6 +676,42 @@ export default function CricketPage() {
             return finalMatch;
         }
         return null;
+    };
+
+    // --- Image Upload Logic ---
+    const handlePlayerImageUpload = (e: React.ChangeEvent<HTMLInputElement>, playerId: string) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+
+            reader.onloadend = () => {
+                const img = new Image();
+                img.src = reader.result as string;
+                img.onload = () => {
+                    // Resize to 150x150
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = 150;
+                    canvas.height = 150;
+                    if (ctx) {
+                        ctx.drawImage(img, 0, 0, 150, 150);
+                        const base64 = canvas.toDataURL('image/jpeg', 0.7); // Compress
+
+                        // Update Player
+                        const updateTeam = (team: Team) => ({
+                            ...team,
+                            players: team.players.map(p => p.id === playerId ? { ...p, photoUrl: base64 } : p)
+                        });
+
+                        // Check Team A
+                        if (teamA.players.some(p => p.id === playerId)) setTeamA(updateTeam(teamA));
+                        // Check Team B
+                        if (teamB.players.some(p => p.id === playerId)) setTeamB(updateTeam(teamB));
+                    }
+                };
+            };
+            reader.readAsDataURL(file);
+        }
     };
 
     const startTournamentMatch = (matchId: string) => {
@@ -1749,8 +1806,27 @@ export default function CricketPage() {
                                 </div>
                                 <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
                                     {teamA.players.map(p => (
-                                        <div key={p.id} className="bg-neutral-800/50 p-3 rounded-lg flex justify-between items-center">
-                                            <span>{p.name}</span>
+                                        <div key={p.id} className="bg-neutral-800/50 p-3 rounded-lg flex justify-between items-center group">
+                                            <div className="flex items-center gap-3">
+                                                <div className="relative w-8 h-8 rounded-full overflow-hidden bg-neutral-700 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity">
+                                                    {p.photoUrl ? (
+                                                        <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <User size={16} className="text-neutral-400" />
+                                                    )}
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        className="absolute inset-0 opacity-0 cursor-pointer"
+                                                        onChange={(e) => handlePlayerImageUpload(e, p.id)}
+                                                    />
+                                                </div>
+                                                <span className="font-bold">{p.name}</span>
+                                            </div>
+                                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => updatePlayer("A", p.id, prompt("New Name:", p.name) || p.name)} className="text-blue-400 hover:text-blue-300"><Edit2 size={16} /></button>
+                                                <button onClick={() => removePlayer("A", p.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16} /></button>
+                                            </div>
                                         </div>
                                     ))}
                                     {teamA.players.length === 0 && <p className="text-neutral-500 text-sm italic">No players added</p>}
@@ -1777,8 +1853,27 @@ export default function CricketPage() {
                                 </div>
                                 <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
                                     {teamB.players.map(p => (
-                                        <div key={p.id} className="bg-neutral-800/50 p-3 rounded-lg flex justify-between items-center">
-                                            <span>{p.name}</span>
+                                        <div key={p.id} className="bg-neutral-800/50 p-3 rounded-lg flex justify-between items-center group">
+                                            <div className="flex items-center gap-3">
+                                                <div className="relative w-8 h-8 rounded-full overflow-hidden bg-neutral-700 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity">
+                                                    {p.photoUrl ? (
+                                                        <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <User size={16} className="text-neutral-400" />
+                                                    )}
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        className="absolute inset-0 opacity-0 cursor-pointer"
+                                                        onChange={(e) => handlePlayerImageUpload(e, p.id)}
+                                                    />
+                                                </div>
+                                                <span className="font-bold">{p.name}</span>
+                                            </div>
+                                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => updatePlayer("B", p.id, prompt("New Name:", p.name) || p.name)} className="text-blue-400 hover:text-blue-300"><Edit2 size={16} /></button>
+                                                <button onClick={() => removePlayer("B", p.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16} /></button>
+                                            </div>
                                         </div>
                                     ))}
                                     {teamB.players.length === 0 && <p className="text-neutral-500 text-sm italic">No players added</p>}
@@ -2338,10 +2433,30 @@ export default function CricketPage() {
                                 <MatchSummaryCard
                                     ref={summaryCardRef}
                                     winnerTeam={winner === 'A' ? teamA.name : teamB.name}
-                                    teamA={{ name: selectedMatch.teamA.name, score: `${selectedMatch.teamA.players.reduce((acc, p) => acc + p.runs, 0)}/${selectedMatch.teamA.players.filter(p => p.out).length}`, overs: `${selectedMatch.overs}` }} // Using current state as snapshot
-                                    teamB={{ name: selectedMatch.teamB.name, score: `${selectedMatch.teamB.players.reduce((acc, p) => acc + p.runs, 0)}/${selectedMatch.teamB.players.filter(p => p.out).length}`, overs: `${selectedMatch.overs}` }} // Placeholder, ideally we have full match state
+                                    teamA={{ name: selectedMatch.teamA.name, score: `${selectedMatch.teamA.players.reduce((acc, p) => acc + p.runs, 0)}/${selectedMatch.teamA.players.filter(p => p.out).length}`, overs: `${selectedMatch.overs}` }}
+                                    teamB={{ name: selectedMatch.teamB.name, score: `${selectedMatch.teamB.players.reduce((acc, p) => acc + p.runs, 0)}/${selectedMatch.teamB.players.filter(p => p.out).length}`, overs: `${selectedMatch.overs}` }}
                                     result={selectedMatch.result}
                                     date={selectedMatch.date}
+                                    manOfTheMatch={(() => {
+                                        const allPlayers = [...selectedMatch.teamA.players, ...selectedMatch.teamB.players];
+                                        if (allPlayers.length === 0) return undefined;
+                                        const best = allPlayers.reduce((prev, current) => {
+                                            const prevPoints = prev.runs + (prev.bowling.wickets * 20);
+                                            const currPoints = current.runs + (current.bowling.wickets * 20);
+                                            return currPoints > prevPoints ? current : prev;
+                                        });
+                                        return { name: best.name, runs: best.runs, wickets: best.bowling.wickets };
+                                    })()}
+                                    manOfTheMatchImage={(() => {
+                                        const allPlayers = [...selectedMatch.teamA.players, ...selectedMatch.teamB.players];
+                                        if (allPlayers.length === 0) return undefined;
+                                        const best = allPlayers.reduce((prev, current) => {
+                                            const prevPoints = prev.runs + (prev.bowling.wickets * 20);
+                                            const currPoints = current.runs + (current.bowling.wickets * 20);
+                                            return currPoints > prevPoints ? current : prev;
+                                        });
+                                        return best.photoUrl;
+                                    })()}
                                 />
                                 <div className="flex gap-4">
                                     <button onClick={handleDownloadSummary} className="px-6 py-3 bg-green-600 rounded-full font-bold flex items-center gap-2 hover:scale-105 transition-transform">
@@ -2598,9 +2713,19 @@ export default function CricketPage() {
                                 {/* Striker */}
                                 <div
                                     onClick={() => !strikerId && console.log("Trigger Select")}
-                                    className={cn("flex px-3 py-3 border-b border-[#222] items-center relative", strikerId ? "" : "animate-pulse bg-red-900/10")}
+                                    className={cn("flex px-3 py-3 border-b border-[#222] items-center relative gap-3", strikerId ? "" : "animate-pulse bg-red-900/10")}
                                 >
                                     {strikerId && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div>}
+
+                                    {/* Player Photo */}
+                                    <div className="w-10 h-10 rounded-full bg-neutral-800 overflow-hidden flex-shrink-0 flex items-center justify-center border border-neutral-700">
+                                        {striker?.photoUrl ? (
+                                            <img src={striker.photoUrl} alt={striker.name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <User size={20} className="text-neutral-500" />
+                                        )}
+                                    </div>
+
                                     <div className="flex-1 flex flex-col justify-center">
                                         <div className="flex items-center gap-2 text-white font-bold text-sm">
                                             {striker?.name || <span className="text-red-400 italic font-normal">Select Striker</span>}
@@ -2617,8 +2742,17 @@ export default function CricketPage() {
                                 {/* Non Striker */}
                                 <div
                                     onClick={() => !nonStrikerId && console.log("Trigger Select")}
-                                    className={cn("flex px-3 py-3 border-b border-[#222] items-center", nonStrikerId ? "" : "animate-pulse bg-red-900/10")}
+                                    className={cn("flex px-3 py-3 border-b border-[#222] items-center gap-3", nonStrikerId ? "" : "animate-pulse bg-red-900/10")}
                                 >
+                                    {/* Player Photo */}
+                                    <div className="w-10 h-10 rounded-full bg-neutral-800 overflow-hidden flex-shrink-0 flex items-center justify-center border border-neutral-700">
+                                        {nonStriker?.photoUrl ? (
+                                            <img src={nonStriker.photoUrl} alt={nonStriker.name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <User size={20} className="text-neutral-500" />
+                                        )}
+                                    </div>
+
                                     <div className="flex-1 flex flex-col justify-center">
                                         <div className="flex items-center gap-2 text-white font-semibold text-sm">
                                             {nonStriker?.name || <span className="text-red-400 italic font-normal">Select Non-Striker</span>}
@@ -2661,9 +2795,19 @@ export default function CricketPage() {
                                     <div className="w-10 text-right">Eco</div>
                                 </div>
                                 <div
-                                    className={cn("flex px-3 py-3 border-b border-[#222] items-center relative", bowlerId ? "" : "animate-pulse bg-yellow-900/10")}
+                                    className={cn("flex px-3 py-3 border-b border-[#222] items-center relative gap-3", bowlerId ? "" : "animate-pulse bg-yellow-900/10")}
                                 >
                                     {bowlerId && <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500"></div>}
+
+                                    {/* Player Photo */}
+                                    <div className="w-10 h-10 rounded-full bg-neutral-800 overflow-hidden flex-shrink-0 flex items-center justify-center border border-neutral-700">
+                                        {bowler?.photoUrl ? (
+                                            <img src={bowler.photoUrl} alt={bowler.name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <User size={20} className="text-neutral-500" />
+                                        )}
+                                    </div>
+
                                     <div className="flex-1">
                                         <div className="text-white font-bold text-sm">
                                             {bowler?.name || <span className="text-yellow-500 italic font-normal">Select Bowler</span>}
