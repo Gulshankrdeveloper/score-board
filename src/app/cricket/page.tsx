@@ -108,6 +108,7 @@ type CommentaryItem = {
     isBoundary: boolean;
     timestamp: number;
     shotCoordinates?: { x: number, y: number };
+    batterId?: string;
 };
 
 type PlayerCareerStats = {
@@ -152,6 +153,8 @@ const ActionButton = ({ onClick, label, color = "bg-blue-600", disabled = false 
 
 import GroundMap from "@/components/GroundMap";
 import LoginModal from "@/components/LoginModal";
+import PartnershipCard from "@/components/PartnershipCard";
+import WormGraph from "@/components/WormGraph";
 
 export default function CricketPage() {
     // --- Game Config State ---
@@ -332,7 +335,48 @@ export default function CricketPage() {
 
     // Commentary State
     const [commentary, setCommentary] = useState<CommentaryItem[]>([]);
+    const runsPerOver = useMemo(() => {
+        // Reverse commentary to get chronological order (oldest first)
+        const chronoComm = [...commentary].reverse();
+        const runs: number[] = [];
+        let cumulative = 0;
+        let currentOverIndex = -1;
 
+        // Group by over
+        // Commentary item has 'over' string like "0.1", "0.2"
+        // We can just track change in integer part of over
+
+        // Simpler: Just map totalRuns at end of each over?
+        // But we need array of values.
+
+        // Let's iterate and track
+        const overRunsMap = new Map<number, number>();
+        let maxOver = -1;
+
+        chronoComm.forEach(ball => {
+            const overNum = Math.floor(parseFloat(ball.over));
+            const runVal = typeof ball.runs === 'number' ? ball.runs : (ball.runs === "WD" || ball.runs === "NB" ? 1 : 0);
+
+            // This is additive. We need cumulative at END of over.
+            // Or just cumulative sum for every ball? Worm graph usually implicitly over-by-over.
+            // Let's do over-by-by-over.
+
+            if (!overRunsMap.has(overNum)) overRunsMap.set(overNum, 0);
+            overRunsMap.set(overNum, overRunsMap.get(overNum)! + runVal);
+            maxOver = Math.max(maxOver, overNum);
+        });
+
+        for (let i = 0; i <= maxOver; i++) {
+            cumulative += (overRunsMap.get(i) || 0);
+            runs.push(cumulative);
+        }
+
+        // If current over is in progress, push current cumulative
+        // Actually the loop above covers it if we use maxOver which comes from commentary
+        return runs;
+    }, [commentary]);
+
+    // UI State
     // UI State
     const [playingTab, setPlayingTab] = useState<'scorecard' | 'commentary' | 'wagon'>('scorecard');
 
@@ -1015,7 +1059,8 @@ export default function CricketPage() {
             isBoundary: runVal === 4 || runVal === 6,
 
             timestamp: Date.now(),
-            shotCoordinates: shotCoordinates
+            shotCoordinates: shotCoordinates,
+            batterId: strikerId || undefined
         };
 
         // Fix Over Number for display in commentary
@@ -2593,6 +2638,17 @@ export default function CricketPage() {
                                     </button>
                                 )}
                             </div>
+
+                            {/* Partnership Card */}
+                            {strikerId && nonStrikerId && (
+                                <div className="mb-1">
+                                    <PartnershipCard
+                                        commentary={commentary}
+                                        striker={strikerId ? currentBattingTeam.players.find(p => p.id === strikerId) || null : null}
+                                        nonStriker={nonStrikerId ? currentBattingTeam.players.find(p => p.id === nonStrikerId) || null : null}
+                                    />
+                                </div>
+                            )}
 
                             {/* Bowler Table */}
                             <div className="bg-[#1a1a1a] mb-1">
