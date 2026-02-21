@@ -202,6 +202,7 @@ export default function CricketPage() {
     const [tournamentName, setTournamentName] = useState("My Tournament");
     const [tempTournamentTeamName, setTempTournamentTeamName] = useState("");
     const [tempTournamentGroup, setTempTournamentGroup] = useState("A");
+    const [activeGroup, setActiveGroup] = useState('All'); // Moved to top level to fix hook violation
 
     // --- API Integration State ---
     const [activeTab, setActiveTab] = useState<'local' | 'global'>('local');
@@ -2009,16 +2010,14 @@ export default function CricketPage() {
     }
 
     if (gameState === "tournament-dashboard") {
-        const [activeGroup, setActiveGroup] = useState('All'); // State for active group filter
-
         // Defensive check for teams
         if (!Array.isArray(tournamentTeams)) {
             setTournamentTeams([]);
             return null;
         }
 
-        const allGroups = Array.from(new Set(tournamentTeams.map(t => t.group || "A"))).sort();
-        const teamsInActiveGroup = tournamentTeams.filter(t => activeGroup === 'All' || (t.group || "A") === activeGroup);
+        const allGroups = Array.from(new Set((tournamentTeams || []).filter(t => t && t.group).map(t => t.group))).sort() as string[];
+        const teamsInActiveGroup = (tournamentTeams || []).filter(t => t && (activeGroup === 'All' || t.group === activeGroup));
 
         return (
             <div className="min-h-screen bg-neutral-950 text-white p-4 md:p-8 flex flex-col items-center max-w-5xl mx-auto">
@@ -2106,21 +2105,21 @@ export default function CricketPage() {
                         <h3 className="text-lg font-bold mb-4 text-green-400">Match Schedule</h3>
                         <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                             {(tournamentMatches || []).map((m, i) => {
-                                const teamA = tournamentTeams.find(t => t.id === m.teamAId);
-                                const teamB = tournamentTeams.find(t => t.id === m.teamBId);
+                                const teamA = (tournamentTeams || []).find(t => t && t.id === m.teamAId);
+                                const teamB = (tournamentTeams || []).find(t => t && t.id === m.teamBId);
                                 return (
-                                    <div key={m.id} className={`p-4 rounded-xl border ${m.completed ? 'bg-neutral-900 border-neutral-800 opacity-70' : 'bg-neutral-800 border-neutral-700'}`}>
+                                    <div key={m?.id || i} className={`p-4 rounded-xl border ${m?.completed ? 'bg-neutral-900 border-neutral-800 opacity-70' : 'bg-neutral-800 border-neutral-700'}`}>
                                         <div className="flex justify-between items-center mb-2">
                                             <span className="text-neutral-500 text-xs">Match {i + 1}</span>
-                                            {m.completed && <span className="text-xs font-bold text-green-500">Completed</span>}
+                                            {m?.completed && <span className="text-xs font-bold text-green-500">Completed</span>}
                                         </div>
                                         <div className="flex justify-between items-center">
-                                            <div className="font-bold">{teamA?.name} <span className="text-neutral-500 font-normal">vs</span> {teamB?.name}</div>
-                                            {m.completed ? (
-                                                <div className="text-xs text-yellow-400 font-bold">{m.result}</div>
+                                            <div className="font-bold">{teamA?.name || 'TBD'} <span className="text-neutral-500 font-normal">vs</span> {teamB?.name || 'TBD'}</div>
+                                            {m?.completed ? (
+                                                <div className="text-xs text-yellow-400 font-bold">{m?.result}</div>
                                             ) : (
                                                 <button
-                                                    onClick={() => startTournamentMatch(m.id)}
+                                                    onClick={() => m?.id && startTournamentMatch(m.id)}
                                                     className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-full transition-colors"
                                                 >
                                                     Play
@@ -2160,21 +2159,21 @@ export default function CricketPage() {
                                     {/* Semi Finals */}
                                     <div className="space-y-4">
                                         <h4 className="text-sm font-bold text-neutral-500 uppercase tracking-widest text-center mb-2">Semi-Finals</h4>
-                                        {(tournamentMatches || []).filter(m => m.stage === 'Semi-Final').map(m => {
-                                            const tA = tournamentTeams.find(t => t.id === m.teamAId);
-                                            const tB = tournamentTeams.find(t => t.id === m.teamBId);
+                                        {(tournamentMatches || []).filter(m => m && m.stage === 'Semi-Final').map((m, i) => {
+                                            const tA = (tournamentTeams || []).find(t => t && t.id === m.teamAId);
+                                            const tB = (tournamentTeams || []).find(t => t && t.id === m.teamBId);
                                             return (
-                                                <div key={m.id} className={cn("p-4 rounded-xl border relative", m.completed ? "bg-neutral-900 border-neutral-800" : "bg-neutral-800 border-orange-500/30")}>
-                                                    <div className="text-xs text-neutral-500 mb-1">{m.matchDate}</div>
+                                                <div key={m?.id || i} className={cn("p-4 rounded-xl border relative", m?.completed ? "bg-neutral-900 border-neutral-800" : "bg-neutral-800 border-orange-500/30")}>
+                                                    <div className="text-xs text-neutral-500 mb-1">{m?.matchDate}</div>
                                                     <div className="flex justify-between items-center">
                                                         <div>
-                                                            <div className={cn("font-bold", m.winnerId === m.teamAId ? "text-green-400" : "text-white")}>{tA?.name}</div>
-                                                            <div className={cn("font-bold", m.winnerId === m.teamBId ? "text-green-400" : "text-white")}>{tB?.name}</div>
+                                                            <div className={cn("font-bold", m?.winnerId === m?.teamAId ? "text-green-400" : "text-white")}>{tA?.name || 'TBD'}</div>
+                                                            <div className={cn("font-bold", m?.winnerId === m?.teamBId ? "text-green-400" : "text-white")}>{tB?.name || 'TBD'}</div>
                                                         </div>
-                                                        {!m.completed && (
-                                                            <button onClick={() => startTournamentMatch(m.id)} className="px-3 py-1 bg-blue-600 text-xs font-bold rounded-lg">Play</button>
+                                                        {m && !m.completed && (
+                                                            <button onClick={() => m.id && startTournamentMatch(m.id)} className="px-3 py-1 bg-blue-600 text-xs font-bold rounded-lg">Play</button>
                                                         )}
-                                                        {m.completed && <div className="text-xs font-bold text-yellow-500">{m.result}</div>}
+                                                        {m?.completed && <div className="text-xs font-bold text-yellow-500">{m?.result}</div>}
                                                     </div>
                                                 </div>
                                             );
@@ -2187,22 +2186,22 @@ export default function CricketPage() {
                                         <div className="hidden md:block absolute left-0 top-1/2 -translate-x-4 w-4 h-full border-l-2 border-dashed border-neutral-700 -translate-y-1/2"></div>
 
                                         <h4 className="text-sm font-bold text-neutral-500 uppercase tracking-widest text-center mb-2">Grand Final</h4>
-                                        {(tournamentMatches || []).filter(m => m.stage === 'Final').map(m => {
-                                            const tA = tournamentTeams.find(t => t.id === m.teamAId);
-                                            const tB = tournamentTeams.find(t => t.id === m.teamBId);
+                                        {(tournamentMatches || []).filter(m => m && m.stage === 'Final').map((m, i) => {
+                                            const tA = (tournamentTeams || []).find(t => t && t.id === m.teamAId);
+                                            const tB = (tournamentTeams || []).find(t => t && t.id === m.teamBId);
                                             return (
-                                                <div key={m.id} className={cn("p-6 rounded-2xl border-2 shadow-2xl relative overflow-hidden", m.completed ? "bg-gradient-to-br from-yellow-900/20 to-black border-yellow-600/50" : "bg-neutral-800 border-yellow-500")}>
+                                                <div key={m?.id || i} className={cn("p-6 rounded-2xl border-2 shadow-2xl relative overflow-hidden", m?.completed ? "bg-gradient-to-br from-yellow-900/20 to-black border-yellow-600/50" : "bg-neutral-800 border-yellow-500")}>
                                                     <div className="absolute top-0 right-0 p-2 opacity-20"><Trophy size={64} className="text-yellow-500" /></div>
                                                     <div className="text-xs text-yellow-500 font-black tracking-widest uppercase mb-4 text-center">🏆 The Championship 🏆</div>
 
                                                     <div className="flex justify-between items-center gap-4">
-                                                        <div className={cn("text-lg font-black", m.winnerId === m.teamAId ? "text-yellow-400 scale-110" : "text-white")}>{tA?.name || "TBD"}</div>
+                                                        <div className={cn("text-lg font-black", m?.winnerId === m?.teamAId ? "text-yellow-400 scale-110" : "text-white")}>{tA?.name || "TBD"}</div>
                                                         <div className="text-xs text-neutral-500 font-bold">VS</div>
-                                                        <div className={cn("text-lg font-black", m.winnerId === m.teamBId ? "text-yellow-400 scale-110" : "text-white")}>{tB?.name || "TBD"}</div>
+                                                        <div className={cn("text-lg font-black", m?.winnerId === m?.teamBId ? "text-yellow-400 scale-110" : "text-white")}>{tB?.name || "TBD"}</div>
                                                     </div>
 
-                                                    {!m.completed && m.teamAId && m.teamBId && (
-                                                        <button onClick={() => startTournamentMatch(m.id)} className="w-full mt-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-black uppercase tracking-wider rounded-lg transition-transform hover:scale-105">
+                                                    {m && !m.completed && m.teamAId && m.teamBId && (
+                                                        <button onClick={() => m.id && startTournamentMatch(m.id)} className="w-full mt-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-black uppercase tracking-wider rounded-lg transition-transform hover:scale-105">
                                                             Play Final
                                                         </button>
                                                     )}
