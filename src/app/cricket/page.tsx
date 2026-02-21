@@ -13,7 +13,8 @@ import { MatchSummaryCard } from "@/components/MatchSummaryCard";
 import { useAudioCommentary } from "@/hooks/useAudioCommentary";
 import { toPng } from 'html-to-image';
 import { useRef } from "react";
-import { Share2, Download, Volume2, VolumeX } from "lucide-react";
+import { Share2, Download, Volume2, VolumeX, Cloud, CloudOff, Globe } from "lucide-react";
+import { syncMatchToCloud, subscribeToMatchSync, SyncMatchData } from "@/services/sync-service";
 
 // --- Types ---
 type Player = {
@@ -213,6 +214,8 @@ export default function CricketPage() {
     const [selectedGlobalMatch, setSelectedGlobalMatch] = useState<ApiMatch | null>(null);
     const [globalMatchDetails, setGlobalMatchDetails] = useState<ApiMatchScorecard | null>(null);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+    const [isCloudSyncEnabled, setIsCloudSyncEnabled] = useState(false);
+    const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
 
     useEffect(() => {
         const loadGlobalMatches = async () => {
@@ -233,49 +236,6 @@ export default function CricketPage() {
             return () => clearTimeout(timer);
         }
     }, [celebration]);
-
-    // --- Persistence ---
-    useEffect(() => {
-        try {
-            const savedHistory = localStorage.getItem('cricket_history');
-            if (savedHistory) setMatchHistory(JSON.parse(savedHistory) || []);
-        } catch (e) { console.error("History parse error", e); }
-
-        try {
-            const savedTournTeams = localStorage.getItem('cricket_tournament_teams');
-            if (savedTournTeams) {
-                const parsed = JSON.parse(savedTournTeams);
-                if (Array.isArray(parsed)) {
-                    setTournamentTeams(parsed.filter((t: any) => t && t.id && t.name));
-                }
-            }
-        } catch (e) { console.error("Teams parse error", e); }
-
-        try {
-            const savedTournMatches = localStorage.getItem('cricket_tournament_matches');
-            if (savedTournMatches) setTournamentMatches(JSON.parse(savedTournMatches) || []);
-        } catch (e) { console.error("Matches parse error", e); }
-
-        // Restore active match if any
-        const savedActiveMatchId = localStorage.getItem('cricket_active_tournament_match');
-        if (savedActiveMatchId) setActiveTournamentMatchId(savedActiveMatchId);
-    }, []);
-
-    useEffect(() => {
-        localStorage.setItem('cricket_tournament_teams', JSON.stringify(tournamentTeams));
-    }, [tournamentTeams]);
-
-    useEffect(() => {
-        localStorage.setItem('cricket_tournament_matches', JSON.stringify(tournamentMatches));
-    }, [tournamentMatches]);
-
-    useEffect(() => {
-        if (activeTournamentMatchId) {
-            localStorage.setItem('cricket_active_tournament_match', activeTournamentMatchId);
-        } else {
-            localStorage.removeItem('cricket_active_tournament_match');
-        }
-    }, [activeTournamentMatchId]);
 
     // --- Team Initial Setup State ---
     const [teamAName, setTeamAName] = useState("Team A");
@@ -387,6 +347,106 @@ export default function CricketPage() {
     // UI State
     // UI State
     const [playingTab, setPlayingTab] = useState<'scorecard' | 'commentary' | 'wagon'>('scorecard');
+
+    // --- Persistence ---
+    useEffect(() => {
+        try {
+            const savedHistory = localStorage.getItem('cricket_history');
+            if (savedHistory) setMatchHistory(JSON.parse(savedHistory) || []);
+        } catch (e) { console.error("History parse error", e); }
+
+        try {
+            const savedTournTeams = localStorage.getItem('cricket_tournament_teams');
+            if (savedTournTeams) {
+                const parsed = JSON.parse(savedTournTeams);
+                if (Array.isArray(parsed)) {
+                    setTournamentTeams(parsed.filter((t: any) => t && t.id && t.name));
+                }
+            }
+        } catch (e) { console.error("Teams parse error", e); }
+
+        try {
+            const savedTournMatches = localStorage.getItem('cricket_tournament_matches');
+            if (savedTournMatches) setTournamentMatches(JSON.parse(savedTournMatches) || []);
+        } catch (e) { console.error("Matches parse error", e); }
+
+        try {
+            const savedActiveMatchId = localStorage.getItem('cricket_active_tournament_match');
+            if (savedActiveMatchId) setActiveTournamentMatchId(savedActiveMatchId);
+        } catch (e) { console.error("Active match parse error", e); }
+    }, []);
+
+    useEffect(() => {
+        localStorage.setItem('cricket_history', JSON.stringify(matchHistory));
+    }, [matchHistory]);
+
+    useEffect(() => {
+        localStorage.setItem('cricket_tournament_teams', JSON.stringify(tournamentTeams));
+    }, [tournamentTeams]);
+
+    useEffect(() => {
+        localStorage.setItem('cricket_tournament_matches', JSON.stringify(tournamentMatches));
+    }, [tournamentMatches]);
+
+    // Viewer Sync Subscription
+    useEffect(() => {
+        if (userRole === 'viewer' && gameState === 'playing' && activeTournamentMatchId) {
+            console.log("Subscribing to cloud match:", activeTournamentMatchId);
+            const unsubscribe = subscribeToMatchSync(activeTournamentMatchId, (data) => {
+                if (data) {
+                    setTeamA(data.teamA);
+                    setTeamB(data.teamB);
+                    setTotalRuns(data.totalRuns);
+                    setTotalWickets(data.totalWickets);
+                    setTotalBalls(data.totalBalls);
+                    setExtras(data.extras);
+                    setCurrentOver(data.currentOver);
+                    setThisOverRuns(data.thisOverRuns);
+                    setStrikerId(data.strikerId);
+                    setNonStrikerId(data.nonStrikerId);
+                    setBowlerId(data.bowlerId);
+                    setBattingTeam(data.battingTeam);
+                    setInnings(data.innings as 1 | 2);
+                    setTargetRuns(data.targetRuns);
+                    setLastSyncedAt(new Date());
+                }
+            });
+            return () => unsubscribe();
+        }
+    }, [userRole, gameState, activeTournamentMatchId]);
+
+    // Cloud Sync Effect
+    useEffect(() => {
+        if (isCloudSyncEnabled && gameState === 'playing' && userRole === 'scorer') {
+            const matchId = activeTournamentMatchId || "local-match-" + teamAName.replace(/\s+/g, '-') + "-" + teamBName.replace(/\s+/g, '-');
+
+            const syncData: Partial<SyncMatchData> = {
+                id: matchId,
+                teamA,
+                teamB,
+                totalRuns,
+                totalWickets,
+                totalBalls,
+                extras,
+                currentOver,
+                thisOverRuns,
+                strikerId,
+                nonStrikerId,
+                bowlerId,
+                battingTeam,
+                innings,
+                targetRuns,
+                status: 'Live'
+            };
+
+            const timer = setTimeout(() => {
+                syncMatchToCloud(matchId, syncData);
+                setLastSyncedAt(new Date());
+            }, 1000); // Debounce sync to avoid too many writes
+
+            return () => clearTimeout(timer);
+        }
+    }, [totalBalls, totalRuns, totalWickets, isCloudSyncEnabled, gameState, userRole, teamAName, teamBName, teamA, teamB, extras, currentOver, thisOverRuns, strikerId, nonStrikerId, bowlerId, battingTeam, innings, targetRuns, activeTournamentMatchId]);
 
     // --- Player Career Stats Calculation ---
     const playerStats = useMemo(() => {
@@ -2609,6 +2669,16 @@ export default function CricketPage() {
                         Match • {innings === 1 ? "1st Innings" : "2nd Innings"}
                     </div>
                     <div className="flex bg-neutral-800 rounded-lg p-0.5 items-center gap-1">
+                        {userRole === 'scorer' && (
+                            <button
+                                onClick={() => setIsCloudSyncEnabled(!isCloudSyncEnabled)}
+                                className={cn("p-1.5 rounded-md transition-all flex items-center gap-1.5 px-2", isCloudSyncEnabled ? "bg-blue-600 text-white" : "hover:bg-neutral-700 text-neutral-400")}
+                                title={isCloudSyncEnabled ? "Cloud Sync Active" : "Enable Cloud Sync"}
+                            >
+                                {isCloudSyncEnabled ? <Cloud size={14} className="animate-pulse" /> : <CloudOff size={14} />}
+                                <span className="text-[10px] font-bold">{isCloudSyncEnabled ? "SYNC" : "OFF"}</span>
+                            </button>
+                        )}
                         <button onClick={toggleMute} className="p-1.5 rounded-md hover:bg-neutral-700 transition-colors">
                             {isMuted ? <VolumeX size={14} className="text-red-400" /> : <Volume2 size={14} className="text-green-400" />}
                         </button>
