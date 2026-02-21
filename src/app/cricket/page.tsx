@@ -14,7 +14,7 @@ import { useAudioCommentary } from "@/hooks/useAudioCommentary";
 import { toPng } from 'html-to-image';
 import { useRef } from "react";
 import { Share2, Download, Volume2, VolumeX, Cloud, CloudOff, Globe } from "lucide-react";
-import { syncMatchToCloud, subscribeToMatchSync, SyncMatchData } from "@/services/sync-service";
+import { syncMatchToCloud, subscribeToMatchSync, subscribeToLiveMatches, SyncMatchData } from "@/services/sync-service";
 
 // --- Types ---
 type Player = {
@@ -206,7 +206,7 @@ export default function CricketPage() {
     const [activeGroup, setActiveGroup] = useState('All'); // Moved to top level to fix hook violation
 
     // --- API Integration State ---
-    const [activeTab, setActiveTab] = useState<'local' | 'global'>('local');
+    const [activeTab, setActiveTab] = useState<'local' | 'global' | 'community'>('local');
     const [activeSubTab, setActiveSubTab] = useState<'live' | 'upcoming' | 'completed'>('live');
     const [globalMatches, setGlobalMatches] = useState<ApiMatch[]>([]);
 
@@ -214,6 +214,7 @@ export default function CricketPage() {
     const [selectedGlobalMatch, setSelectedGlobalMatch] = useState<ApiMatch | null>(null);
     const [globalMatchDetails, setGlobalMatchDetails] = useState<ApiMatchScorecard | null>(null);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+    const [communityMatches, setCommunityMatches] = useState<SyncMatchData[]>([]);
     const [isCloudSyncEnabled, setIsCloudSyncEnabled] = useState(false);
     const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
 
@@ -223,6 +224,13 @@ export default function CricketPage() {
             setGlobalMatches(data);
         };
         loadGlobalMatches();
+
+        // Community Matches Subscription (Global Live)
+        const unsubscribe = subscribeToLiveMatches((matches) => {
+            setCommunityMatches(matches);
+        });
+
+        return () => unsubscribe();
     }, []);
 
 
@@ -387,6 +395,14 @@ export default function CricketPage() {
     useEffect(() => {
         localStorage.setItem('cricket_tournament_matches', JSON.stringify(tournamentMatches));
     }, [tournamentMatches]);
+
+    // Handle Match Completion Sync
+    useEffect(() => {
+        if (showMatchResultModal && isCloudSyncEnabled && userRole === 'scorer') {
+            const matchId = activeTournamentMatchId || "local-match-" + teamAName.replace(/\s+/g, '-') + "-" + teamBName.replace(/\s+/g, '-');
+            syncMatchToCloud(matchId, { status: 'Completed' });
+        }
+    }, [showMatchResultModal, isCloudSyncEnabled, userRole, activeTournamentMatchId, teamAName, teamBName]);
 
     // Viewer Sync Subscription
     useEffect(() => {
@@ -1380,6 +1396,15 @@ export default function CricketPage() {
                         >
                             International
                         </button>
+                        <button
+                            onClick={() => { setActiveTab('community'); setActiveSubTab('live'); }}
+                            className={cn(
+                                "flex-1 py-2 text-sm font-bold rounded-lg transition-all",
+                                activeTab === 'community' ? "bg-neutral-800 text-white shadow-sm" : "text-neutral-500 hover:text-neutral-300"
+                            )}
+                        >
+                            Community
+                        </button>
                     </div>
                 </div>
 
@@ -1418,6 +1443,82 @@ export default function CricketPage() {
                             transition={{ duration: 0.2 }}
                             className="space-y-4"
                         >
+                            {/* --- COMMUNITY (FIREBASE) MATCHES --- */}
+                            {activeTab === 'community' && (
+                                <>
+                                    {communityMatches.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center py-12 text-neutral-500">
+                                            <div className="bg-neutral-900 p-4 rounded-full mb-4 opacity-50"><Globe size={24} /></div>
+                                            <p className="text-sm">No live community matches found.</p>
+                                            <p className="text-[10px] mt-2 text-neutral-600">Matches scored by others will appear here.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2 flex items-center justify-center gap-2 mb-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+                                                <div className="text-[10px] font-bold text-blue-400 uppercase tracking-widest text-center">
+                                                    Live Community Board
+                                                </div>
+                                            </div>
+                                            {communityMatches.map((match) => (
+                                                <div
+                                                    key={match.id}
+                                                    onClick={() => {
+                                                        setActiveTournamentMatchId(match.id);
+                                                        setGameState("playing");
+                                                        setViewMode("match");
+                                                    }}
+                                                    className="bg-[#0f0f0f] border border-neutral-800 rounded-2xl p-5 shadow-lg relative overflow-hidden group cursor-pointer hover:border-blue-500/30 transition-all active:scale-[0.98]"
+                                                >
+                                                    <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/10 rounded-full blur-2xl -mr-5 -mt-5 pointer-events-none"></div>
+
+                                                    <div className="flex justify-between items-start mb-4 relative">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="bg-blue-500/20 text-blue-500 text-[10px] font-bold px-2 py-0.5 rounded-full border border-blue-500/20 flex items-center gap-1">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span> LIVE
+                                                            </span>
+                                                            <span className="text-xs text-neutral-500">ID: {match.id.substring(0, 8)}...</span>
+                                                        </div>
+                                                        <div className="text-[10px] text-neutral-600 font-mono">
+                                                            {match.updatedAt?.seconds ? new Date(match.updatedAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Live'}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex justify-between items-center px-2">
+                                                        <div className="flex flex-col items-center gap-2">
+                                                            <div className="w-12 h-12 rounded-full bg-neutral-800 border-2 border-neutral-700 flex items-center justify-center text-lg font-black text-white shadow-xl">
+                                                                {match.teamA?.name?.substring(0, 1).toUpperCase() || "T"}
+                                                            </div>
+                                                            <span className="font-bold text-sm text-neutral-300">{match.teamA?.name}</span>
+                                                        </div>
+
+                                                        <div className="text-center">
+                                                            <div className="text-2xl font-black text-white leading-tight">
+                                                                {match.totalRuns}/{match.totalWickets}
+                                                            </div>
+                                                            <div className="text-[10px] font-bold text-neutral-500 font-mono">
+                                                                {Math.floor(match.totalBalls / 6)}.{match.totalBalls % 6} Overs
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex flex-col items-center gap-2">
+                                                            <div className="w-12 h-12 rounded-full bg-neutral-800 border-2 border-neutral-700 flex items-center justify-center text-lg font-black text-white shadow-xl">
+                                                                {match.teamB?.name?.substring(0, 1).toUpperCase() || "T"}
+                                                            </div>
+                                                            <span className="font-bold text-sm text-neutral-300">{match.teamB?.name}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <button className="w-full mt-4 py-2 bg-neutral-900 border border-neutral-800 rounded-xl text-[10px] font-bold text-neutral-400 uppercase tracking-widest group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-500 transition-all">
+                                                        Watch Live Scorecard
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
                             {/* --- GLOBAL (INTERNATIONAL) MATCHES --- */}
                             {activeTab === 'global' && (
                                 <>
@@ -2677,6 +2778,19 @@ export default function CricketPage() {
                             >
                                 {isCloudSyncEnabled ? <Cloud size={14} className="animate-pulse" /> : <CloudOff size={14} />}
                                 <span className="text-[10px] font-bold">{isCloudSyncEnabled ? "SYNC" : "OFF"}</span>
+                            </button>
+                        )}
+                        {isCloudSyncEnabled && userRole === 'scorer' && (
+                            <button
+                                onClick={() => {
+                                    const matchId = activeTournamentMatchId || "local-match-" + teamAName.replace(/\s+/g, '-') + "-" + teamBName.replace(/\s+/g, '-');
+                                    navigator.clipboard.writeText(matchId);
+                                    alert(`Match ID copied: ${matchId}`);
+                                }}
+                                className="p-1.5 rounded-md hover:bg-neutral-700 text-blue-400 transition-colors"
+                                title="Copy Match ID"
+                            >
+                                <Share2 size={14} />
                             </button>
                         )}
                         <button onClick={toggleMute} className="p-1.5 rounded-md hover:bg-neutral-700 transition-colors">

@@ -7,7 +7,10 @@ import {
     query,
     where,
     Timestamp,
-    getDoc
+    getDoc,
+    getDocs,
+    limit,
+    orderBy
 } from "firebase/firestore";
 
 // Basic Match Data Interface (Matches CricketPage state)
@@ -76,4 +79,24 @@ export const fetchMatchFromCloud = async (matchId: string) => {
         console.error("Error fetching match from cloud:", error);
         return null;
     }
+};
+
+/**
+ * Subscribes to all live matches for the global discovery dashboard.
+ */
+export const subscribeToLiveMatches = (onUpdate: (matches: SyncMatchData[]) => void) => {
+    const q = query(
+        collection(db, MATCHES_COLLECTION),
+        where("status", "==", "Live"),
+        orderBy("updatedAt", "desc"),
+        limit(20)
+    );
+
+    return onSnapshot(q, (snapshot) => {
+        const matches: SyncMatchData[] = [];
+        snapshot.forEach((doc) => {
+            matches.push({ id: doc.id, ...doc.data() } as SyncMatchData);
+        });
+        onUpdate(matches);
+    });
 };
