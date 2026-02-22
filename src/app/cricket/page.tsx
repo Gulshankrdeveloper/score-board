@@ -78,7 +78,7 @@ type TournamentMatch = {
     result: string;
 
     matchDate: string;
-    stage: 'Group' | 'Semi-Final' | 'Final';
+    stage: 'Group' | 'Semi-Final' | 'Final' | 'Qualifier 1' | 'Eliminator' | 'Qualifier 2';
 };
 
 type GameStateSnapshot = {
@@ -217,6 +217,10 @@ export default function CricketPage() {
     const [communityMatches, setCommunityMatches] = useState<SyncMatchData[]>([]);
     const [isCloudSyncEnabled, setIsCloudSyncEnabled] = useState(false);
     const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+
+    // Track scores for both teams for better sync
+    const [teamAScoreState, setTeamAScoreState] = useState({ runs: 0, wickets: 0, balls: 0 });
+    const [teamBScoreState, setTeamBScoreState] = useState({ runs: 0, wickets: 0, balls: 0 });
 
     useEffect(() => {
         const loadGlobalMatches = async () => {
@@ -452,6 +456,8 @@ export default function CricketPage() {
                 battingTeam,
                 innings,
                 targetRuns,
+                teamAScore: battingTeam === 'A' ? { runs: totalRuns, wickets: totalWickets, balls: totalBalls } : teamAScoreState,
+                teamBScore: battingTeam === 'B' ? { runs: totalRuns, wickets: totalWickets, balls: totalBalls } : teamBScoreState,
                 status: 'Live'
             };
 
@@ -462,7 +468,16 @@ export default function CricketPage() {
 
             return () => clearTimeout(timer);
         }
-    }, [totalBalls, totalRuns, totalWickets, isCloudSyncEnabled, gameState, userRole, teamAName, teamBName, teamA, teamB, extras, currentOver, thisOverRuns, strikerId, nonStrikerId, bowlerId, battingTeam, innings, targetRuns, activeTournamentMatchId]);
+    }, [totalBalls, totalRuns, totalWickets, isCloudSyncEnabled, gameState, userRole, teamAName, teamBName, teamA, teamB, extras, currentOver, thisOverRuns, strikerId, nonStrikerId, bowlerId, battingTeam, innings, targetRuns, activeTournamentMatchId, teamAScoreState, teamBScoreState]);
+
+    // Keep team-specific score states updated
+    useEffect(() => {
+        if (battingTeam === 'A') {
+            setTeamAScoreState({ runs: totalRuns, wickets: totalWickets, balls: totalBalls });
+        } else {
+            setTeamBScoreState({ runs: totalRuns, wickets: totalWickets, balls: totalBalls });
+        }
+    }, [totalRuns, totalWickets, totalBalls, battingTeam]);
 
     // --- Player Career Stats Calculation ---
     const playerStats = useMemo(() => {
@@ -680,84 +695,94 @@ export default function CricketPage() {
 
         // 2. Check if Knockouts already exist
         if (tournamentMatches.some(m => m.stage && m.stage !== 'Group')) {
-            alert("Knockout stage already generated!");
+            alert("Playoff stage already generated!");
             return;
         }
 
-        const newMatches: TournamentMatch[] = [];
-
-        // 3. Identify Top Teams
-        // Sort teams by Points, then NRR (using Runs/wickets logic effectively via points for now, or just Points)
-        // Since we don't have full NRR, we rely on Points. If tie, we can use run quotient if we had it.
-        // For now: Points > Won > Random/First
-        // For now: Points > Won > Random/First
+        // 3. Identify Top 4 Teams
         const sortedTeams = [...tournamentTeams].filter(t => t && t.id).sort((a, b) => {
             if ((b.points || 0) !== (a.points || 0)) return (b.points || 0) - (a.points || 0);
             if ((b.won || 0) !== (a.won || 0)) return (b.won || 0) - (a.won || 0);
+            if ((b.nrr || 0) !== (a.nrr || 0)) return (b.nrr || 0) - (a.nrr || 0);
             return 0;
         });
 
-        // Scenario A: 1 Group (Top 4 qualify)
-        // Scenario B: 2 Groups (Top 2 from each qualify)
-        const groups = Array.from(new Set(tournamentTeams.map(t => t.group || "A")));
-
-        let sf1: TournamentMatch | null = null;
-        let sf2: TournamentMatch | null = null;
-
-        if (groups.length === 1) {
-            if (sortedTeams.length < 4) { alert("Need at least 4 teams for Semi-Finals"); return; }
-            // SF1: 1st vs 4th
-            // SF2: 2nd vs 3rd
-            const t1 = sortedTeams[0];
-            const t2 = sortedTeams[1];
-            const t3 = sortedTeams[2];
-            const t4 = sortedTeams[3];
-
-            sf1 = { id: Date.now().toString() + "sf1", teamAId: t1.id, teamBId: t4.id, winnerId: null, completed: false, result: "", matchDate: "Semi-Final 1", stage: 'Semi-Final' };
-            sf2 = { id: Date.now().toString() + "sf2", teamAId: t2.id, teamBId: t3.id, winnerId: null, completed: false, result: "", matchDate: "Semi-Final 2", stage: 'Semi-Final' };
-        } else {
-            // 2 Groups: A1 vs B2, B1 vs A2
-            const groupA = sortedTeams.filter(t => (t.group || "A") === "A");
-            const groupB = sortedTeams.filter(t => (t.group || "A") === "B");
-
-            if (groupA.length < 2 || groupB.length < 2) { alert("Need at least 2 teams per group"); return; }
-
-            sf1 = { id: Date.now().toString() + "sf1", teamAId: groupA[0].id, teamBId: groupB[1].id, winnerId: null, completed: false, result: "", matchDate: "Semi-Final 1", stage: 'Semi-Final' };
-            sf2 = { id: Date.now().toString() + "sf2", teamAId: groupB[0].id, teamBId: groupA[1].id, winnerId: null, completed: false, result: "", matchDate: "Semi-Final 2", stage: 'Semi-Final' };
+        if (sortedTeams.length < 4) {
+            alert("Need at least 4 teams for Playoffs");
+            return;
         }
 
-        if (sf1 && sf2) {
-            setTournamentMatches([...tournamentMatches, sf1, sf2]);
-            alert("Semi-Finals Generated!");
-        }
+        const t1 = sortedTeams[0];
+        const t2 = sortedTeams[1];
+        const t3 = sortedTeams[2];
+        const t4 = sortedTeams[3];
+
+        const q1: TournamentMatch = {
+            id: "q1-" + Date.now().toString(),
+            teamAId: t1.id,
+            teamBId: t2.id,
+            winnerId: null,
+            completed: false,
+            result: "",
+            matchDate: "Qualifier 1 (1st vs 2nd)",
+            stage: 'Qualifier 1'
+        };
+
+        const eliminator: TournamentMatch = {
+            id: "elim-" + Date.now().toString(),
+            teamAId: t3.id,
+            teamBId: t4.id,
+            winnerId: null,
+            completed: false,
+            result: "",
+            matchDate: "Eliminator (3rd vs 4th)",
+            stage: 'Eliminator'
+        };
+
+        setTournamentMatches([...tournamentMatches, q1, eliminator]);
+        alert("Playoffs Generated: Qualifier 1 & Eliminator!");
     };
 
     const checkForFinals = (updatedMatches: TournamentMatch[]) => {
-        const semis = updatedMatches.filter(m => m.stage === 'Semi-Final');
-        const finalExists = updatedMatches.some(m => m.stage === 'Final');
+        const q1 = updatedMatches.find(m => m.stage === 'Qualifier 1');
+        const eliminator = updatedMatches.find(m => m.stage === 'Eliminator');
+        const q2 = updatedMatches.find(m => m.stage === 'Qualifier 2');
+        const finalMatch = updatedMatches.find(m => m.stage === 'Final');
 
-        if (semis.length === 2 && semis.every(m => m.completed) && !finalExists) {
-            // Create Final
-            const w1id = semis[0].winnerId!;
-            const w2id = semis[1].winnerId!;
+        // 1. Generate Qualifier 2 (Loser Q1 vs Winner Eliminator)
+        if (q1?.completed && eliminator?.completed && !q2) {
+            const loserQ1Id = q1.winnerId === q1.teamAId ? q1.teamBId : q1.teamAId;
+            const winnerElimId = eliminator.winnerId!;
 
-            const finalMatch: TournamentMatch = {
-                id: Date.now().toString() + "final",
-                teamAId: w1id,
-                teamBId: w2id,
+            return {
+                id: "q2-" + Date.now().toString(),
+                teamAId: loserQ1Id,
+                teamBId: winnerElimId,
+                winnerId: null,
+                completed: false,
+                result: "",
+                matchDate: "Qualifier 2 (Loser Q1 vs Winner Eliminator)",
+                stage: 'Qualifier 2'
+            } as TournamentMatch;
+        }
+
+        // 2. Generate Final (Winner Q1 vs Winner Q2)
+        if (q1?.completed && q2?.completed && !finalMatch) {
+            const winnerQ1Id = q1.winnerId!;
+            const winnerQ2Id = q2.winnerId!;
+
+            return {
+                id: "final-" + Date.now().toString(),
+                teamAId: winnerQ1Id,
+                teamBId: winnerQ2Id,
                 winnerId: null,
                 completed: false,
                 result: "",
                 matchDate: "GRAND FINAL",
                 stage: 'Final'
-            };
-
-            // We need to trigger this update. 
-            // Better to return it or set state.
-            // Since this is called inside saveMatch/endMatch context, we might need to be careful with state updates.
-            // Let's just append it to the update.
-            return finalMatch;
+            } as TournamentMatch;
         }
+
         return null;
     };
 
@@ -867,63 +892,44 @@ export default function CricketPage() {
 
                 let winnerId = null;
                 const batRuns = totalRuns;
-                const bowlRuns = innings === 2 ? (targetRuns ? targetRuns - 1 : 0) : 0; // Rough logic
 
-                // Better: Pass "winningTeam" to saveMatch?
-                // Let's do simple logic: If target chased -> Batting wins. Else Bowling wins.
+                // Detection logic:
+                // If 2nd innings:
+                //   If batting team reached target -> Batting Team wins.
+                //   Else -> Bowling Team wins.
+                // If 1st innings:
+                //   (Technically shouldn't happens as match ends in 2nd, but for safety)
+                //   Bowling Team wins (if match ended prematurely).
+
                 if (innings === 2 && targetRuns && totalRuns >= targetRuns) {
-                    winnerId = currentBattingTeam.name === teamA.name ? match.teamAId : match.teamBId;
+                    winnerId = battingTeam === "A" ? match.teamAId : match.teamBId;
                 } else {
-                    winnerId = currentBowlingTeam.name === teamA.name ? match.teamAId : match.teamBId;
+                    // For defend wins, the bowling team wins
+                    winnerId = battingTeam === "A" ? match.teamBId : match.teamAId;
                 }
 
                 match.winnerId = winnerId;
-                // Check for Finals
-                const finalMatch = checkForFinals(updatedMatches);
-                if (finalMatch) {
-                    updatedMatches.push(finalMatch);
-                    alert("Grand Final Generated!");
+                match.completed = true;
+                match.result = winnerId === match.teamAId ? `${teamA.name} Won` : `${teamB.name} Won`;
+
+                // Check if this match was a Playoff match to generate next round
+                const finalMatchToAdd = checkForFinals(updatedMatches);
+                if (finalMatchToAdd) {
+                    updatedMatches.push(finalMatchToAdd);
                 }
 
-                match.result = winnerId === match.teamAId ? `${teamA.name} Won` : `${teamB.name} Won`;
                 setTournamentMatches(updatedMatches);
 
-                // Update Points Table
-                const winner = winnerId === match.teamAId ? 'A' : 'B'; // Determine winner based on match.winnerId
-                const winnerTeamName = winner === 'A' ? teamA.name : teamB.name; // Storing Name for simplicity in history, but ID for tourney
-                // Note: In tourney mode, we need IDs. For now, assuming names map to IDs or we use names.
-                // Better: Find team objects in tournamentTeams
-
-                if (activeTournamentMatchId) { // If tournament is active
-                    const teamAObj = tournamentTeams.find(t => t.id === match.teamAId);
-                    const teamBObj = tournamentTeams.find(t => t.id === match.teamBId);
-
-                    if (teamAObj && teamBObj) {
-                        // Update Stats for NRR
-                        // This is complex to track perfectly without full match state.
-                        // Simplified: We update simply based on this match result if we had full 2nd innings score.
-                        // For now, let's just update Runs Scored and Overs Faced for the Batting Team.
-                        // And Runs Conceded and Overs Bowled for the Bowling Team.
-
-                        // But wait, this is only ONE innings. A match has 2 innings.
-                        // We need to handle this ONLY at the END of the match.
-                        // Ideally, we persist specific match stats.
-                        // Simplified NRR for this prototype:
-                        // Just += points.
-                    }
-
+                // Update Points Table (Only for Group matches)
+                if (match.stage === 'Group') {
                     const updatedTeams = tournamentTeams.map(team => {
                         if (team.id === winnerId) {
                             return { ...team, played: team.played + 1, won: team.won + 1, points: team.points + 2 };
                         } else if (team.id === match.teamAId || team.id === match.teamBId) {
-                            // This team played but didn't win
                             return { ...team, played: team.played + 1, lost: team.lost + 1 };
                         }
                         return team;
                     });
-
-                    // Recalculate NRR if we had the data.
-                    // For now, sticking to Points.
                     setTournamentTeams(updatedTeams);
                 }
                 setActiveTournamentMatchId(null);
@@ -1486,26 +1492,40 @@ export default function CricketPage() {
 
                                                     <div className="flex justify-between items-center px-2">
                                                         <div className="flex flex-col items-center gap-2">
-                                                            <div className="w-12 h-12 rounded-full bg-neutral-800 border-2 border-neutral-700 flex items-center justify-center text-lg font-black text-white shadow-xl">
+                                                            <div className="w-12 h-12 rounded-full bg-neutral-800 border-2 border-neutral-700 flex items-center justify-center text-lg font-black text-white shadow-xl relative overflow-hidden group-hover:border-blue-500/50 transition-colors">
                                                                 {match.teamA?.name?.substring(0, 1).toUpperCase() || "T"}
                                                             </div>
-                                                            <span className="font-bold text-sm text-neutral-300">{match.teamA?.name}</span>
+                                                            <div className="text-center">
+                                                                <div className="font-bold text-xs text-neutral-300 truncate w-20">{match.teamA?.name}</div>
+                                                                <div className="text-[10px] font-black text-white mt-0.5">
+                                                                    {match.teamAScore?.runs}/{match.teamAScore?.wickets}
+                                                                </div>
+                                                                <div className="text-[8px] text-neutral-500 font-mono">
+                                                                    ({Math.floor((match.teamAScore?.balls || 0) / 6)}.{(match.teamAScore?.balls || 0) % 6} ov)
+                                                                </div>
+                                                            </div>
                                                         </div>
 
-                                                        <div className="text-center">
-                                                            <div className="text-2xl font-black text-white leading-tight">
-                                                                {match.totalRuns}/{match.totalWickets}
-                                                            </div>
-                                                            <div className="text-[10px] font-bold text-neutral-500 font-mono">
-                                                                {Math.floor(match.totalBalls / 6)}.{match.totalBalls % 6} Overs
+                                                        <div className="flex flex-col items-center">
+                                                            <div className="text-xs font-black text-blue-500/50 mb-1">VS</div>
+                                                            <div className="px-2 py-0.5 bg-neutral-800 rounded text-[8px] font-bold text-neutral-500 uppercase tracking-tighter">
+                                                                {match.innings === 1 ? '1st Innings' : '2nd Innings'}
                                                             </div>
                                                         </div>
 
                                                         <div className="flex flex-col items-center gap-2">
-                                                            <div className="w-12 h-12 rounded-full bg-neutral-800 border-2 border-neutral-700 flex items-center justify-center text-lg font-black text-white shadow-xl">
+                                                            <div className="w-12 h-12 rounded-full bg-neutral-800 border-2 border-neutral-700 flex items-center justify-center text-lg font-black text-white shadow-xl relative overflow-hidden group-hover:border-blue-500/50 transition-colors">
                                                                 {match.teamB?.name?.substring(0, 1).toUpperCase() || "T"}
                                                             </div>
-                                                            <span className="font-bold text-sm text-neutral-300">{match.teamB?.name}</span>
+                                                            <div className="text-center">
+                                                                <div className="font-bold text-xs text-neutral-300 truncate w-20">{match.teamB?.name}</div>
+                                                                <div className="text-[10px] font-black text-white mt-0.5">
+                                                                    {match.teamBScore?.runs}/{match.teamBScore?.wickets}
+                                                                </div>
+                                                                <div className="text-[8px] text-neutral-500 font-mono">
+                                                                    ({Math.floor((match.teamBScore?.balls || 0) / 6)}.{(match.teamBScore?.balls || 0) % 6} ov)
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
 
@@ -2312,73 +2332,129 @@ export default function CricketPage() {
 
                         {/* Bracket Display */}
                         {(tournamentMatches || []).some(m => m.stage && m.stage !== 'Group') && (
-                            <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6">
-                                <h3 className="text-xl font-bold mb-6 text-orange-500 flex items-center gap-2">
-                                    <Trophy size={20} /> Knockout Bracket
+                            <div className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8 shadow-2xl overflow-hidden relative">
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
+
+                                <h3 className="text-2xl font-black mb-8 text-yellow-500 flex items-center gap-3 italic">
+                                    <Trophy size={28} className="animate-pulse" /> PLAYOFF BRACKET
                                 </h3>
-                                <div className="grid md:grid-cols-2 gap-8 relative">
-                                    {/* Semi Finals */}
-                                    <div className="space-y-4">
-                                        <h4 className="text-sm font-bold text-neutral-500 uppercase tracking-widest text-center mb-2">Semi-Finals</h4>
-                                        {(tournamentMatches || []).filter(m => m && m.stage === 'Semi-Final').map((m, i) => {
-                                            const tA = (tournamentTeams || []).find(t => t && t.id === m.teamAId);
-                                            const tB = (tournamentTeams || []).find(t => t && t.id === m.teamBId);
-                                            return (
-                                                <div key={m?.id || i} className={cn("p-4 rounded-xl border relative", m?.completed ? "bg-neutral-900 border-neutral-800" : "bg-neutral-800 border-orange-500/30")}>
-                                                    <div className="text-xs text-neutral-500 mb-1">{m?.matchDate}</div>
-                                                    <div className="flex justify-between items-center">
-                                                        <div>
-                                                            <div className={cn("font-bold", m?.winnerId === m?.teamAId ? "text-green-400" : "text-white")}>{tA?.name || 'TBD'}</div>
-                                                            <div className={cn("font-bold", m?.winnerId === m?.teamBId ? "text-green-400" : "text-white")}>{tB?.name || 'TBD'}</div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                    {/* Column 1: Q1 & Eliminator */}
+                                    <div className="space-y-8 flex flex-col justify-center">
+                                        <div className="space-y-4">
+                                            <div className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mb-2 text-center">First Round</div>
+                                            {['Qualifier 1', 'Eliminator'].map(stage => {
+                                                const match = (tournamentMatches || []).find(m => m.stage === stage);
+                                                if (!match) return null;
+                                                const tA = (tournamentTeams || []).find(t => t && t.id === match.teamAId);
+                                                const tB = (tournamentTeams || []).find(t => t && t.id === match.teamBId);
+                                                return (
+                                                    <div key={match.id} className={cn("p-5 rounded-2xl border transition-all", match.completed ? "bg-neutral-900/80 border-neutral-800 opacity-60" : "bg-neutral-800 border-yellow-500/30 shadow-lg")}>
+                                                        <div className="flex justify-between items-center mb-3">
+                                                            <span className="text-[10px] font-bold text-yellow-600 bg-yellow-500/10 px-2 py-0.5 rounded uppercase">{stage}</span>
+                                                            {match.completed && <span className="text-[10px] font-bold text-green-500">FINAL</span>}
                                                         </div>
-                                                        {m && !m.completed && (
-                                                            <button onClick={() => m.id && startTournamentMatch(m.id)} className="px-3 py-1 bg-blue-600 text-xs font-bold rounded-lg">Play</button>
+                                                        <div className="space-y-2">
+                                                            <div className={cn("flex justify-between items-center text-sm font-bold", match.winnerId === match.teamAId ? "text-green-400" : "text-white")}>
+                                                                <span className="truncate w-32">{tA?.name || 'TBD'}</span>
+                                                                {match.completed && match.winnerId === match.teamAId && <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]"></div>}
+                                                            </div>
+                                                            <div className={cn("flex justify-between items-center text-sm font-bold", match.winnerId === match.teamBId ? "text-green-400" : "text-white")}>
+                                                                <span className="truncate w-32">{tB?.name || 'TBD'}</span>
+                                                                {match.completed && match.winnerId === match.teamBId && <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]"></div>}
+                                                            </div>
+                                                        </div>
+                                                        {!match.completed && (
+                                                            <button onClick={() => startTournamentMatch(match.id)} className="w-full mt-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all active:scale-95">Play Match</button>
                                                         )}
-                                                        {m?.completed && <div className="text-xs font-bold text-yellow-500">{m?.result}</div>}
                                                     </div>
-                                                </div>
-                                            );
-                                        })}
+                                                );
+                                            })}
+                                        </div>
                                     </div>
 
-                                    {/* Final */}
-                                    <div className="flex flex-col justify-center relative">
-                                        {/* Connecting Lines (Visual Only - distinct for desktop) */}
-                                        <div className="hidden md:block absolute left-0 top-1/2 -translate-x-4 w-4 h-full border-l-2 border-dashed border-neutral-700 -translate-y-1/2"></div>
-
-                                        <h4 className="text-sm font-bold text-neutral-500 uppercase tracking-widest text-center mb-2">Grand Final</h4>
-                                        {(tournamentMatches || []).filter(m => m && m.stage === 'Final').map((m, i) => {
-                                            const tA = (tournamentTeams || []).find(t => t && t.id === m.teamAId);
-                                            const tB = (tournamentTeams || []).find(t => t && t.id === m.teamBId);
+                                    {/* Column 2: Q2 */}
+                                    <div className="flex flex-col justify-center">
+                                        <div className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mb-4 text-center">Semi Final</div>
+                                        {(() => {
+                                            const match = (tournamentMatches || []).find(m => m.stage === 'Qualifier 2');
+                                            if (!match) return (
+                                                <div className="p-8 border-2 border-dashed border-neutral-800 rounded-2xl bg-neutral-900/30 flex items-center justify-center text-center">
+                                                    <p className="text-[10px] font-bold text-neutral-600 italic">Q2 will be generated after Q1 & Eliminator</p>
+                                                </div>
+                                            );
+                                            const tA = (tournamentTeams || []).find(t => t && t.id === match.teamAId);
+                                            const tB = (tournamentTeams || []).find(t => t && t.id === match.teamBId);
                                             return (
-                                                <div key={m?.id || i} className={cn("p-6 rounded-2xl border-2 shadow-2xl relative overflow-hidden", m?.completed ? "bg-gradient-to-br from-yellow-900/20 to-black border-yellow-600/50" : "bg-neutral-800 border-yellow-500")}>
-                                                    <div className="absolute top-0 right-0 p-2 opacity-20"><Trophy size={64} className="text-yellow-500" /></div>
-                                                    <div className="text-xs text-yellow-500 font-black tracking-widest uppercase mb-4 text-center">🏆 The Championship 🏆</div>
+                                                <div className={cn("p-5 rounded-2xl border-2 transition-all relative overflow-hidden", match.completed ? "bg-neutral-900 border-neutral-800 opacity-60" : "bg-neutral-800 border-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.15)]")}>
+                                                    <div className="absolute top-0 right-0 p-1 opacity-10"><Trophy size={48} className="text-indigo-400" /></div>
+                                                    <div className="flex justify-between items-center mb-3 relative">
+                                                        <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded uppercase">QUALIFIER 2</span>
+                                                    </div>
+                                                    <div className="space-y-2 relative">
+                                                        <div className={cn("flex justify-between items-center text-sm font-black", match.winnerId === match.teamAId ? "text-green-400" : "text-white")}>
+                                                            <span className="truncate w-32">{tA?.name || 'LOSER Q1'}</span>
+                                                            {match.completed && match.winnerId === match.teamAId && <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]"></div>}
+                                                        </div>
+                                                        <div className={cn("flex justify-between items-center text-sm font-black", match.winnerId === match.teamBId ? "text-green-400" : "text-white")}>
+                                                            <span className="truncate w-32">{tB?.name || 'WINNER ELIM'}</span>
+                                                            {match.completed && match.winnerId === match.teamBId && <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]"></div>}
+                                                        </div>
+                                                    </div>
+                                                    {!match.completed && (
+                                                        <button onClick={() => startTournamentMatch(match.id)} className="w-full mt-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all">Start Q2</button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
 
-                                                    <div className="flex justify-between items-center gap-4">
-                                                        <div className={cn("text-lg font-black", m?.winnerId === m?.teamAId ? "text-yellow-400 scale-110" : "text-white")}>{tA?.name || "TBD"}</div>
-                                                        <div className="text-xs text-neutral-500 font-bold">VS</div>
-                                                        <div className={cn("text-lg font-black", m?.winnerId === m?.teamBId ? "text-yellow-400 scale-110" : "text-white")}>{tB?.name || "TBD"}</div>
+                                    {/* Column 3: Grand Final */}
+                                    <div className="flex flex-col justify-center">
+                                        <div className="text-[10px] font-black text-yellow-500/50 uppercase tracking-[0.2em] mb-4 text-center">Ultimate Battle</div>
+                                        {(() => {
+                                            const match = (tournamentMatches || []).find(m => m.stage === 'Final');
+                                            if (!match) return (
+                                                <div className="p-8 border-2 border-dashed border-neutral-800 rounded-2xl bg-neutral-900/30 flex items-center justify-center text-center">
+                                                    <p className="text-[10px] font-bold text-neutral-600 italic">Final will be generated after Q2</p>
+                                                </div>
+                                            );
+                                            const tA = (tournamentTeams || []).find(t => t && t.id === match.teamAId);
+                                            const tB = (tournamentTeams || []).find(t => t && t.id === match.teamBId);
+                                            return (
+                                                <div className={cn("p-6 rounded-3xl border-2 transition-all relative overflow-hidden", match.completed ? "bg-gradient-to-br from-yellow-900/30 to-black border-yellow-600" : "bg-neutral-800 border-yellow-500 shadow-[0_0_40px_rgba(234,179,8,0.2)]")}>
+                                                    <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent pointer-events-none"></div>
+                                                    <div className="absolute top-0 right-0 p-2 opacity-20"><Trophy size={64} className="text-yellow-500" /></div>
+                                                    <div className="text-xs text-yellow-500 font-black tracking-[0.3em] uppercase mb-4 text-center">GRAND FINAL</div>
+
+                                                    <div className="space-y-4">
+                                                        <div className={cn("text-lg font-black text-center transition-all", match.winnerId === match.teamAId ? "text-yellow-400 scale-110" : "text-white")}>
+                                                            {tA?.name || "WINNER Q1"}
+                                                        </div>
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="flex-1 h-px bg-neutral-700"></div>
+                                                            <div className="text-[10px] text-neutral-500 font-bold">VS</div>
+                                                            <div className="flex-1 h-px bg-neutral-700"></div>
+                                                        </div>
+                                                        <div className={cn("text-lg font-black text-center transition-all", match.winnerId === match.teamBId ? "text-yellow-400 scale-110" : "text-white")}>
+                                                            {tB?.name || "WINNER Q2"}
+                                                        </div>
                                                     </div>
 
-                                                    {m && !m.completed && m.teamAId && m.teamBId && (
-                                                        <button onClick={() => m.id && startTournamentMatch(m.id)} className="w-full mt-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-black uppercase tracking-wider rounded-lg transition-transform hover:scale-105">
-                                                            Play Final
+                                                    {!match.completed && (
+                                                        <button onClick={() => startTournamentMatch(match.id)} className="w-full mt-6 py-3 bg-yellow-500 hover:bg-yellow-400 text-black font-black uppercase tracking-wider rounded-2xl transition-all shadow-lg hover:shadow-yellow-500/20 active:scale-95">
+                                                            PLAY FINAL
                                                         </button>
                                                     )}
-                                                    {m.completed && (
-                                                        <div className="mt-4 text-center text-sm font-bold text-green-400 bg-green-900/20 py-2 rounded-lg border border-green-500/20">
-                                                            Winner: {m.winnerId === m.teamAId ? tA?.name : tB?.name}
+                                                    {match.completed && (
+                                                        <div className="mt-6 text-center text-sm font-black text-yellow-500 bg-yellow-500/10 py-3 rounded-2xl border border-yellow-500/30 animate-pulse">
+                                                            🏆 {match.winnerId === match.teamAId ? tA?.name : tB?.name} CHAMPIONS 🏆
                                                         </div>
                                                     )}
                                                 </div>
                                             );
-                                        })}
-                                        {tournamentMatches.filter(m => m.stage === 'Final').length === 0 && (
-                                            <div className="flex items-center justify-center p-8 border-2 border-dashed border-neutral-800 rounded-xl bg-neutral-900/30 text-neutral-600 font-bold text-sm italic">
-                                                Final will be generated after Semis.
-                                            </div>
-                                        )}
+                                        })()}
                                     </div>
                                 </div>
                             </div>

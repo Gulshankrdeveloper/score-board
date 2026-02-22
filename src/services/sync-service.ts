@@ -30,6 +30,8 @@ export interface SyncMatchData {
     battingTeam: "A" | "B";
     innings: number;
     targetRuns: number | null;
+    teamAScore?: { runs: number; wickets: number; balls: number };
+    teamBScore?: { runs: number; wickets: number; balls: number };
     status: 'Live' | 'Completed';
     updatedAt: any;
 }
