@@ -52,6 +52,7 @@ type MatchRecord = {
     overs: string;
     result: string;
     extras: { w: number; nb: number; b: number; lb: number };
+    tournamentName?: string;
 };
 
 type TournamentTeam = {
@@ -865,7 +866,8 @@ export default function CricketPage() {
             wickets: totalWickets,
             overs: `${overs}.${ballsInOver}`,
             result: `${currentBattingTeam.name} scored ${totalRuns}/${totalWickets} in ${overs}.${ballsInOver} overs`,
-            extras: extras
+            extras: extras,
+            tournamentName: activeTournamentMatchId ? tournamentName : undefined
         };
         const updatedHistory = [newRecord, ...matchHistory];
         setMatchHistory(updatedHistory);
@@ -1908,6 +1910,28 @@ export default function CricketPage() {
                     </div>
                 </div>
 
+                {/* Persistent Tournament Workspace Banner */}
+                {tournamentTeams.length > 0 && (
+                    <div className="w-full bg-gradient-to-r from-yellow-600/20 to-orange-600/20 border border-yellow-500/30 rounded-2xl p-6 mb-8 flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden group">
+                        <div className="absolute top-0 left-0 w-32 h-32 bg-yellow-500/10 rounded-full blur-3xl -ml-16 -mt-16 pointer-events-none"></div>
+                        <div className="flex items-center gap-4 relative z-10">
+                            <div className="w-14 h-14 bg-yellow-500/20 rounded-2xl flex items-center justify-center text-yellow-500 shadow-inner">
+                                <Trophy size={32} className="group-hover:scale-110 transition-transform" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-black text-white">{tournamentName || "Active Tournament"}</h2>
+                                <p className="text-sm text-yellow-500/70 font-bold uppercase tracking-widest">{tournamentTeams.length} Teams Registered</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setGameState("tournament-dashboard")}
+                            className="w-full md:w-auto px-8 py-3 bg-yellow-500 hover:bg-yellow-400 text-black font-black uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-yellow-500/20 active:scale-95 z-10"
+                        >
+                            Resume Tournament Dashboard
+                        </button>
+                    </div>
+                )}
+
                 {viewMode === 'stats' ? (
                     <div className="w-full max-w-5xl animate-in fade-in slide-in-from-bottom-4">
                         <div className="bg-[#1a1a1a] rounded-2xl border border-[#333] overflow-hidden shadow-2xl">
@@ -2723,30 +2747,89 @@ export default function CricketPage() {
                     <button onClick={() => userRole === 'viewer' ? setViewMode('dashboard') : setGameState("setup")} className="text-neutral-400 hover:text-white">{userRole === 'viewer' ? 'Back to Dashboard' : 'Back to Setup'}</button>
                 </div>
 
-                <div className="w-full space-y-4">
-                    {matchHistory.length === 0 ? (
-                        <div className="text-neutral-600 text-center py-12">No match history yet.</div>
-                    ) : (
-                        matchHistory.map(match => (
-                            <div key={match.id} onClick={() => setSelectedMatch(match)} className="cursor-pointer bg-neutral-900/50 border border-neutral-800 rounded-xl p-4 flex justify-between items-center hover:bg-neutral-800 hover:border-neutral-700 transition-all group">
-                                <div>
-                                    <div className="text-xs text-neutral-500 mb-1">{match.date}</div>
-                                    <div className="font-bold text-lg mb-1 group-hover:text-blue-300 transition-colors">{typeof match.teamA === 'string' ? match.teamA : match.teamA.name} vs {typeof match.teamB === 'string' ? match.teamB : match.teamB.name}</div>
-                                    <div className="text-neutral-400 font-mono text-sm">{match.result}</div>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <span className="text-xs text-neutral-600 group-hover:text-neutral-400">Click for details</span>
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); deleteMatch(match.id); }}
-                                        className="p-2 text-red-500/50 hover:text-red-500 hover:bg-neutral-700 rounded-lg transition-all"
-                                        title="Delete Record"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
+                {/* Persistent Tournament Workspace Banner (History View) */}
+                {tournamentTeams.length > 0 && (
+                    <div className="w-full bg-neutral-900 border border-yellow-500/20 rounded-2xl p-4 mb-8 flex justify-between items-center gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-500">
+                                <Trophy size={20} />
                             </div>
-                        ))
+                            <div className="text-sm font-bold text-white tracking-wide">{tournamentName || "Active Tournament"}</div>
+                        </div>
+                        <button
+                            onClick={() => setGameState("tournament-dashboard")}
+                            className="bg-yellow-500 hover:bg-yellow-400 text-black px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest shadow-lg shadow-yellow-500/10 transition-all active:scale-95"
+                        >
+                            Dashboard
+                        </button>
+                    </div>
+                )}
+
+                <div className="w-full space-y-8">
+                    {/* Tournament Matches Section */}
+                    {matchHistory.some(m => m.tournamentName) && (
+                        <div>
+                            <h2 className="text-sm font-black text-yellow-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                <Trophy size={16} /> Tournament Records
+                            </h2>
+                            <div className="space-y-3">
+                                {matchHistory.filter(m => m.tournamentName).map(match => (
+                                    <div key={match.id} onClick={() => setSelectedMatch(match)} className="cursor-pointer bg-neutral-900 border border-yellow-500/10 rounded-2xl p-4 flex justify-between items-center hover:bg-neutral-800 hover:border-yellow-500/30 transition-all group relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 p-1">
+                                            <span className="text-[8px] font-black text-yellow-500/50 uppercase">{match.tournamentName}</span>
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] text-neutral-500 mb-1 font-mono uppercase">{match.date}</div>
+                                            <div className="font-bold text-lg mb-1 group-hover:text-yellow-300 transition-colors">
+                                                {typeof match.teamA === 'string' ? match.teamA : match.teamA.name} vs {typeof match.teamB === 'string' ? match.teamB : match.teamB.name}
+                                            </div>
+                                            <div className="text-yellow-500/70 font-mono text-xs italic">{match.result}</div>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); deleteMatch(match.id); }}
+                                                className="p-2 text-red-500/30 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     )}
+
+                    {/* Quick Matches Section */}
+                    <div>
+                        <h2 className="text-sm font-black text-neutral-500 uppercase tracking-[0.2em] mb-4">
+                            Quick Matches
+                        </h2>
+                        {matchHistory.filter(m => !m.tournamentName).length === 0 ? (
+                            <div className="text-neutral-700 text-center py-8 border-2 border-dashed border-neutral-900 rounded-2xl italic text-sm">No quick matches yet.</div>
+                        ) : (
+                            <div className="space-y-3">
+                                {matchHistory.filter(m => !m.tournamentName).map(match => (
+                                    <div key={match.id} onClick={() => setSelectedMatch(match)} className="cursor-pointer bg-neutral-900/50 border border-neutral-800 rounded-2xl p-4 flex justify-between items-center hover:bg-neutral-800 hover:border-neutral-700 transition-all group">
+                                        <div>
+                                            <div className="text-[10px] text-neutral-500 mb-1 font-mono uppercase">{match.date}</div>
+                                            <div className="font-bold text-lg mb-1 group-hover:text-blue-300 transition-colors">
+                                                {typeof match.teamA === 'string' ? match.teamA : match.teamA.name} vs {typeof match.teamB === 'string' ? match.teamB : match.teamB.name}
+                                            </div>
+                                            <div className="text-neutral-400 font-mono text-sm">{match.result}</div>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); deleteMatch(match.id); }}
+                                                className="p-2 text-red-500/30 hover:text-red-500 hover:bg-neutral-700 rounded-lg transition-all"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         );
