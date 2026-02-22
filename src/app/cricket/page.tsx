@@ -13,7 +13,7 @@ import { MatchSummaryCard } from "@/components/MatchSummaryCard";
 import { useAudioCommentary } from "@/hooks/useAudioCommentary";
 import { toPng } from 'html-to-image';
 import { useRef } from "react";
-import { Share2, Download, Volume2, VolumeX, Cloud, CloudOff, Globe } from "lucide-react";
+import { Share2, Download, Volume2, VolumeX, Cloud, CloudOff, Globe, Star } from "lucide-react";
 import { syncMatchToCloud, subscribeToMatchSync, subscribeToLiveMatches, SyncMatchData } from "@/services/sync-service";
 
 // --- Types ---
@@ -259,11 +259,18 @@ export default function CricketPage() {
 
     const [showSummaryModal, setShowSummaryModal] = useState(false);
     const summaryCardRef = useRef<HTMLDivElement>(null);
-    const { speak, isMuted, toggleMute } = useAudioCommentary();
+    const { speak, isMuted, toggleMute, lang, changeLang } = useAudioCommentary();
+
+    // --- Advanced Match Settings ---
+    const [isLBWDisabled, setIsLBWDisabled] = useState(false);
+    const [isFreeHitEnabled, setIsFreeHitEnabled] = useState(true);
+    const [powerplayOvers, setPowerplayOvers] = useState(6);
+    const [isFreeHitActive, setIsFreeHitActive] = useState(false);
 
     // --- Match Conclusion State ---
     const [showMatchResultModal, setShowMatchResultModal] = useState(false);
     const [matchResultText, setMatchResultText] = useState("");
+    const [showWicketModal, setShowWicketModal] = useState(false);
 
     // --- Wagon Wheel State ---
     const [showShotInput, setShowShotInput] = useState(false);
@@ -534,11 +541,48 @@ export default function CricketPage() {
             processPlayers(match.teamA.players);
             processPlayers(match.teamB.players);
         });
-
         return Array.from(statsMap.values()).sort((a, b) => b.runs - a.runs);
     }, [matchHistory]);
 
+    // --- Tournament Awards Calculation ---
+    const tournamentAwards = useMemo(() => {
+        if (!tournamentName || matchHistory.length === 0) return null;
 
+        const tournMatches = matchHistory.filter(m => m.tournamentName === tournamentName);
+        if (tournMatches.length === 0) return null;
+
+        const runnerMap = new Map<string, { name: string, runs: number, balls: number }>();
+        const wicketMap = new Map<string, { name: string, wickets: number, runs: number }>();
+        const potmRatingMap = new Map<string, { name: string, score: number }>();
+
+        tournMatches.forEach(match => {
+            const process = (players: Player[]) => {
+                players.forEach(p => {
+                    if (!runnerMap.has(p.name)) runnerMap.set(p.name, { name: p.name, runs: 0, balls: 0 });
+                    const r = runnerMap.get(p.name)!;
+                    r.runs += p.runs;
+                    r.balls += p.balls;
+
+                    if (!wicketMap.has(p.name)) wicketMap.set(p.name, { name: p.name, wickets: 0, runs: 0 });
+                    const w = wicketMap.get(p.name)!;
+                    w.wickets += p.bowling.wickets;
+                    w.runs += p.bowling.runs;
+
+                    const potmScore = (p.runs) + (p.bowling.wickets * 25);
+                    if (!potmRatingMap.has(p.name)) potmRatingMap.set(p.name, { name: p.name, score: 0 });
+                    potmRatingMap.get(p.name)!.score += potmScore;
+                });
+            };
+            process(match.teamA.players);
+            process(match.teamB.players);
+        });
+
+        const orangeCap = Array.from(runnerMap.values()).sort((a, b) => b.runs - a.runs)[0];
+        const purpleCap = Array.from(wicketMap.values()).sort((a, b) => b.wickets - a.wickets || a.runs - b.runs)[0];
+        const potm = Array.from(potmRatingMap.values()).sort((a, b) => b.score - a.score)[0];
+
+        return { orangeCap, purpleCap, potm };
+    }, [matchHistory, tournamentName]);
 
     // --- Selectors ---
     const currentBattingTeam = battingTeam === "A" ? teamA : teamB;
@@ -549,7 +593,6 @@ export default function CricketPage() {
     const bowler = currentBowlingTeam.players.find(p => p.id === bowlerId);
 
     const [lastOverBowlerId, setLastOverBowlerId] = useState<string | null>(null);
-
 
     // --- Logic Helpers ---
     const fillDummyTeams = () => {
@@ -1117,67 +1160,89 @@ export default function CricketPage() {
     const processBall = (runs: number | string, shotCoordinates?: { x: number, y: number }) => {
         saveState(); // Save state before modifying
         let runVal = 0;
-        // let isExtra = false; // Unused in this simplified logic, but kept for context if needed later
         let isWicket = false;
         let isValidBall = true;
         let shouldEndInnings = false;
+        const hindiMode = lang === 'hi';
 
         if (typeof runs === 'number') {
             runVal = runs;
             updateBatsmanScore(runs);
             updateBowlerStats(runs, false, true);
+
             if (runs === 4) {
                 setCelebration("4");
-                speak("Four runs! Magnificent shot!");
-            }
-            if (runs === 6) {
+                speak(hindiMode ? "Shaandaar chauka!" : "Four runs! Magnificent shot!");
+            } else if (runs === 6) {
                 setCelebration("6");
-                speak("Six runs! That is huge!");
-            }
-            if (runs === 0) {
-                speak("No run.");
+                speak(hindiMode ? "Behtareen chhaka!" : "Six runs! That is huge!");
+            } else if (runs === 0) {
+                speak(hindiMode ? "Koi run nahi." : "No run.");
             } else if (runs === 1) {
-                speak("Single.");
-            } else if (runs === 2) {
-                speak("Two runs.");
-            } else if (runs === 3) {
-                speak("Three runs.");
+                speak(hindiMode ? "Ek run." : "Single.");
+            } else {
+                speak(hindiMode ? `${runs} run.` : `${runs} runs.`);
             }
+
+            // Reset Free Hit if it was active
+            if (isFreeHitActive) setIsFreeHitActive(false);
+
         } else {
             // Specials
             if (runs === "W") { // Wicket
-                isWicket = true;
-                setCelebration("W");
-                speak("Wicket! What a delivery!");
-                setTotalWickets(w => w + 1);
-                updateBatsmanScore(0); // Ball faced, 0 runs
-                markStrikerOut();
-                updateBowlerStats(0, true, true);
-
-                if (totalWickets + 1 >= 10) { // 10 wickets = All Out in 11 player team
-                    shouldEndInnings = true;
-                    if (innings === 1) {
-                        setTimeout(startInningsBreak, 2000);
-                        speak("All out! End of first innings.");
+                // Free Hit Check
+                if (isFreeHitActive) {
+                    const isRunOut = confirm(hindiMode ? "Free Hit hai! Kya ye Run Out hai?" : "It's a Free Hit! Was it a Run Out?");
+                    if (!isRunOut) {
+                        speak(hindiMode ? "Free hit par bach gaye!" : "Survived on a Free Hit!");
+                        // Treat as a dot ball but valid ball for the over
+                        updateBowlerStats(0, false, true);
+                        // Rest of the logic handles ball count
                     } else {
-                        // End Match logic here if needed, currently manual "End Match"
-                        alert("All Out! End of Match.");
-                        speak("All out! End of match.");
+                        isWicket = true;
                     }
                 } else {
-                    // Delay showing batsman selection until animation is done
-                    setTimeout(() => {
-                        setStrikerId(null);
-                    }, 2500);
+                    isWicket = true;
                 }
+
+                if (isWicket) {
+                    setCelebration("W");
+                    // If runs is "W" and we passed the type in shotCoordinates (hijacked)
+                    const wicketMethod = (runs === "W" && typeof shotCoordinates === 'string') ? shotCoordinates : "Out";
+                    speak(hindiMode ? `${wicketMethod}! Zabardast wicket!` : `${wicketMethod}! What a delivery!`);
+                    setTotalWickets(w => w + 1);
+                    updateBatsmanScore(0);
+                    markStrikerOut();
+                    updateBowlerStats(0, true, true);
+
+                    if (totalWickets + 1 >= 10) {
+                        shouldEndInnings = true;
+                        if (innings === 1) {
+                            setTimeout(startInningsBreak, 2000);
+                            speak(hindiMode ? "All out! Pehli innings khatam." : "All out! End of first innings.");
+                        } else {
+                            alert(hindiMode ? "All Out! Match khatam." : "All Out! End of Match.");
+                            speak(hindiMode ? "All out! Match samapt." : "All out! End of match.");
+                        }
+                    } else {
+                        setTimeout(() => setStrikerId(null), 2500);
+                    }
+                }
+
+                if (isFreeHitActive) setIsFreeHitActive(false);
+
             } else if (runs === "WD" || runs === "NB") {
-                // isExtra = true;
                 isValidBall = false;
                 runVal = 1;
                 setExtras(prev => ({ ...prev, [runs === "WD" ? "w" : "nb"]: prev[runs === "WD" ? "w" : "nb"] + 1 }));
-                updateBowlerStats(1, false, false); // Extra run charged to bowler usually
-                speak(runs === "WD" ? "Wide ball!" : "No ball!");
-                speak(runs === "WD" ? "Wide ball!" : "No ball!");
+                updateBowlerStats(1, false, false);
+
+                if (runs === "NB" && isFreeHitEnabled) {
+                    setIsFreeHitActive(true);
+                    speak(hindiMode ? "No ball! Agli ball Free Hit!" : "No ball! Next ball is a Free Hit!");
+                } else {
+                    speak(hindiMode ? (runs === "WD" ? "Wide ball!" : "No ball!") : (runs === "WD" ? "Wide ball!" : "No ball!"));
+                }
             }
         }
 
@@ -1187,7 +1252,8 @@ export default function CricketPage() {
         const batterName = striker?.name || "Batter";
 
         if (isWicket) {
-            commText = `${bowlerName} to ${batterName}, OUT! Cleanled bowled? Caught? Takes the wicket!`;
+            const wicketMethod = (runs === "W" && typeof shotCoordinates === 'string') ? shotCoordinates : "OUT";
+            commText = `${bowlerName} to ${batterName}, ${wicketMethod}! Takes the wicket!`;
         } else if (isValidBall) {
             if (runVal === 4) commText = `${bowlerName} to ${batterName}, FOUR! What a shot!`;
             else if (runVal === 6) commText = `${bowlerName} to ${batterName}, SIX! Huge hit!`;
@@ -1198,11 +1264,12 @@ export default function CricketPage() {
             commText = `${bowlerName} to ${batterName}, ${runs === "WD" ? "Wide" : "No Ball"}.`;
         }
 
+
         const newCommItem: CommentaryItem = {
             id: Date.now().toString(),
             over: `${Math.floor(totalBalls / 6)}.${(totalBalls % 6) + (isValidBall ? 1 : 0)}`, // Approx
             text: commText,
-            runs: runs,
+            runs: isFreeHitActive && runs === "NB" ? "Free Hit" : runs,
             isWicket: isWicket,
             isBoundary: runVal === 4 || runVal === 6,
 
@@ -1233,8 +1300,8 @@ export default function CricketPage() {
 
             // Target Chased Check (Innings 2)
             if (innings === 2 && targetRuns && (totalRuns + runVal) >= targetRuns) {
-                const resultMsg = `Match Won by ${currentBattingTeam.name}!`;
-                speak(`${currentBattingTeam.name} won the match!`);
+                const resultMsg = hindiMode ? `${currentBattingTeam.name} ne match jeet liya hai!` : `Match Won by ${currentBattingTeam.name}!`;
+                speak(hindiMode ? `${currentBattingTeam.name} match jeet chuki hai!` : `${currentBattingTeam.name} won the match!`);
                 setMatchResultText(resultMsg);
                 setShowMatchResultModal(true);
                 return;
@@ -1269,15 +1336,12 @@ export default function CricketPage() {
                     setLastOverBowlerId(bowlerId);
                     setBowlerId(null);
 
-                    speak(`End of over. ${currentBattingTeam.name} score is ${totalRuns} for ${totalWickets}.`);
+                    speak(hindiMode ?
+                        `Over ki samapti. ${currentBattingTeam.name} ka score ${totalRuns} run ${totalWickets} wicket par.` :
+                        `End of over. ${currentBattingTeam.name} score is ${totalRuns} for ${totalWickets}.`
+                    );
 
                     // 3. ALWAYS swap ends at end of over (regardless of last ball run)
-                    // But wait, if we swapped above (odd run), doing it again here cancels it out?
-                    // Rule: Run taken (odd) -> Swap. Then End of over -> Ends change (Swap).
-                    // So effectively, original striker is back at strike? Yes.
-                    // Calling swapStriker() twice effectively does nothing if synchronous, but logic says:
-                    // Odd run logic happens NOW. Over end logic happens usually immediately or after.
-                    // Let's just call it again.
                     swapStriker();
                 }, 2000);
             } else {
@@ -1959,7 +2023,7 @@ export default function CricketPage() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-[#222]">
-                                        {playerStats.length === 0 ? (
+                                        {(!playerStats || playerStats.length === 0) ? (
                                             <tr><td colSpan={10} className="p-8 text-center text-neutral-500 italic">No stats available yet. Play matches to build careers!</td></tr>
                                         ) : (
                                             playerStats.map((p, i) => (
@@ -2100,26 +2164,66 @@ export default function CricketPage() {
                                     Tournament Match
                                 </div>
                             )}
-                            <h3 className="text-xl font-bold mb-4 text-neutral-300">Match Settings</h3>
-                            <div className="flex flex-col gap-2">
-                                <label className="text-neutral-400">Total Overs: <span className="text-blue-400 font-bold">{totalOvers}</span></label>
-                                <input
-                                    type="range"
-                                    min="1"
-                                    max="20"
-                                    value={totalOvers}
-                                    onChange={(e) => setTotalOvers(parseInt(e.target.value))}
-                                    className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                                />
-                                <div className="flex justify-between text-xs text-neutral-500 mt-1">
-                                    <span>1 Over</span>
-                                    <span>10 Overs</span>
-                                    <span>20 Overs</span>
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-bold text-neutral-300">Match Settings</h3>
+                                <div className="flex bg-neutral-800 p-1 rounded-xl border border-neutral-700">
+                                    <button onClick={() => changeLang('en')} className={cn("px-4 py-1.5 rounded-lg text-xs font-black transition-all", lang === 'en' ? "bg-blue-600 text-white" : "text-neutral-500 hover:text-white")}>ENGLISH</button>
+                                    <button onClick={() => changeLang('hi')} className={cn("px-4 py-1.5 rounded-lg text-xs font-black transition-all", lang === 'hi' ? "bg-orange-600 text-white" : "text-neutral-500 hover:text-white")}>HINDI</button>
+                                </div>
+                            </div>
+
+                            <div className="grid md:grid-cols-2 gap-8">
+                                <div className="space-y-6">
+                                    <div>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <label className="text-neutral-400 text-sm font-bold uppercase tracking-wider">Total Overs</label>
+                                            <span className="text-blue-400 font-black text-lg">{totalOvers}</span>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min="1"
+                                            max="20"
+                                            value={totalOvers}
+                                            onChange={(e) => setTotalOvers(parseInt(e.target.value))}
+                                            className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <label className="text-neutral-400 text-sm font-bold uppercase tracking-wider">Powerplay Overs</label>
+                                            <span className="text-yellow-500 font-black text-lg">{powerplayOvers}</span>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max={Math.floor(totalOvers / 2)}
+                                            value={powerplayOvers}
+                                            onChange={(e) => setPowerplayOvers(parseInt(e.target.value))}
+                                            className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <button
+                                        onClick={() => setIsFreeHitEnabled(!isFreeHitEnabled)}
+                                        className={cn("w-full p-4 rounded-xl border flex justify-between items-center transition-all", isFreeHitEnabled ? "bg-blue-500/10 border-blue-500/50 text-white" : "bg-neutral-800/50 border-neutral-700 text-neutral-500")}
+                                    >
+                                        <span className="font-bold">Free Hit for No Balls</span>
+                                        <div className={cn("w-4 h-4 rounded-full border-2", isFreeHitEnabled ? "bg-blue-400 border-blue-300" : "border-neutral-600")}></div>
+                                    </button>
+                                    <button
+                                        onClick={() => setIsLBWDisabled(!isLBWDisabled)}
+                                        className={cn("w-full p-4 rounded-xl border flex justify-between items-center transition-all", !isLBWDisabled ? "bg-green-500/10 border-green-500/50 text-white" : "bg-neutral-800/50 border-neutral-700 text-neutral-500")}
+                                    >
+                                        <span className="font-bold">LBW Rule (Enabled)</span>
+                                        <div className={cn("w-4 h-4 rounded-full border-2", !isLBWDisabled ? "bg-green-400 border-green-300" : "border-neutral-600")}></div>
+                                    </button>
                                 </div>
                             </div>
 
                             {isAdmin && (
-                                <button onClick={fillDummyTeams} className="text-xs text-neutral-500 underline hover:text-white mt-4">
+                                <button onClick={fillDummyTeams} className="text-xs text-neutral-500 underline hover:text-white mt-8">
                                     Quick Fill Teams (Dev)
                                 </button>
                             )}
@@ -2341,6 +2445,68 @@ export default function CricketPage() {
                     <div className="md:col-span-2 flex flex-col gap-6">
                         {/* Generate Button (Only if Group Stage Done & No Knockouts yet) */}
                         {/* Generate Button (Only if Group Stage Done & No Knockouts yet) */}
+                        {/* Tournament Awards Section */}
+                        {tournamentAwards && (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                                <div className="bg-gradient-to-br from-orange-500/10 to-transparent border border-orange-500/20 p-4 rounded-2xl relative overflow-hidden group">
+                                    <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                        <Trophy size={80} className="text-orange-500" />
+                                    </div>
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="p-2 bg-orange-500/20 rounded-lg text-orange-500">
+                                            <Trophy size={20} />
+                                        </div>
+                                        <span className="text-xs font-black text-orange-400 uppercase tracking-widest">Orange Cap</span>
+                                    </div>
+                                    <div className="flex justify-between items-end">
+                                        <div>
+                                            <div className="text-xl font-black text-white">{tournamentAwards.orangeCap?.name || '---'}</div>
+                                            <div className="text-xs text-neutral-500 italic">Most Runs in Tournament</div>
+                                        </div>
+                                        <div className="text-2xl font-black text-orange-400">{tournamentAwards.orangeCap?.runs || 0}</div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-gradient-to-br from-purple-500/10 to-transparent border border-purple-500/20 p-4 rounded-2xl relative overflow-hidden group">
+                                    <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                        <Trophy size={80} className="text-purple-500" />
+                                    </div>
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="p-2 bg-purple-500/20 rounded-lg text-purple-500">
+                                            <Trophy size={20} />
+                                        </div>
+                                        <span className="text-xs font-black text-purple-400 uppercase tracking-widest">Purple Cap</span>
+                                    </div>
+                                    <div className="flex justify-between items-end">
+                                        <div>
+                                            <div className="text-xl font-black text-white">{tournamentAwards.purpleCap?.name || '---'}</div>
+                                            <div className="text-xs text-neutral-500 italic">Most Wickets in Tournament</div>
+                                        </div>
+                                        <div className="text-2xl font-black text-purple-400">{tournamentAwards.purpleCap?.wickets || 0}</div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-gradient-to-br from-blue-500/10 to-transparent border border-blue-500/20 p-4 rounded-2xl relative overflow-hidden group">
+                                    <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                        <Star size={80} className="text-blue-500" />
+                                    </div>
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400">
+                                            <Star size={20} />
+                                        </div>
+                                        <span className="text-xs font-black text-blue-400 uppercase tracking-widest">Tournament Star</span>
+                                    </div>
+                                    <div className="flex justify-between items-end">
+                                        <div>
+                                            <div className="text-xl font-black text-white">{tournamentAwards.potm?.name || '---'}</div>
+                                            <div className="text-xs text-neutral-500 italic">Best Overall Performer</div>
+                                        </div>
+                                        <div className="text-2xl font-black text-blue-400">{Math.round(tournamentAwards.potm?.score || 0)} <span className="text-[10px] font-normal text-neutral-500">pts</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {(tournamentMatches || []).length > 0 &&
                             (tournamentMatches || []).filter(m => !m.stage || m.stage === 'Group').every(m => m.completed) &&
                             !(tournamentMatches || []).some(m => m.stage && m.stage !== 'Group') && (
@@ -2968,8 +3134,16 @@ export default function CricketPage() {
                     {/* Background Pattern */}
                     <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
 
-                    <div>
-                        <div className="flex items-baseline gap-2 mb-1">
+                    <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                            {(totalBalls / 6) < powerplayOvers && (
+                                <span className="bg-yellow-500/20 text-yellow-500 text-[10px] font-black px-2 py-0.5 rounded-full border border-yellow-500/30 uppercase tracking-tighter">Powerplay</span>
+                            )}
+                            {isFreeHitActive && (
+                                <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse uppercase tracking-tighter shadow-lg shadow-red-600/20">Free Hit</span>
+                            )}
+                        </div>
+                        <div className="flex items-baseline gap-2">
                             <h1 className="text-4xl font-black text-white leading-none tracking-tight">
                                 {totalRuns}<span className="text-neutral-500">/</span>{totalWickets}
                             </h1>
@@ -3311,7 +3485,7 @@ export default function CricketPage() {
                                     NB
                                 </button>
                                 <button
-                                    onClick={() => handleBall("W")}
+                                    onClick={() => setShowWicketModal(true)}
                                     disabled={!strikerId || !bowlerId}
                                     className="h-10 rounded-lg font-bold text-lg bg-red-600 text-white hover:bg-red-500 active:scale-95 disabled:opacity-20 shadow-[0_0_15px_rgba(220,38,38,0.4)]"
                                 >
@@ -3384,14 +3558,6 @@ export default function CricketPage() {
                                         onClick={() => {
                                             saveMatch();
                                             setShowMatchResultModal(false);
-                                            // Reset State or go to History?
-                                            // Creating a "Post Match" flow would be best, but for now:
-                                            // Let's trigger "Share Summary" immediately after saving?
-                                            // Or just go to history.
-                                            setGameState("history");
-                                            // Set selected match to the one just saved (newest)
-                                            // We need to wait for state update... tedious.
-                                            // Let's just go to setup for now as requested.
                                             setGameState("setup");
                                         }}
                                         className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-green-500/20"
@@ -3409,6 +3575,40 @@ export default function CricketPage() {
                         </div>
                     )
                 }
+
+                {/* Wicket Type Modal */}
+                {showWicketModal && (
+                    <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md animate-in fade-in zoom-in duration-300">
+                        <div className="bg-[#1a1a1a] border border-[#333] rounded-2xl w-full max-w-sm p-4 overflow-hidden shadow-2xl">
+                            <div className="flex justify-between items-center mb-4 px-2">
+                                <h3 className="text-lg font-bold text-white">Select Wicket Type</h3>
+                                <button onClick={() => setShowWicketModal(false)} className="text-neutral-500 hover:text-white"><X size={20} /></button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                {['Bowled', 'Caught', 'LBW', 'Run Out', 'Stumped', 'Hit Wicket'].map(type => (
+                                    <button
+                                        key={type}
+                                        onClick={() => {
+                                            if (type === 'LBW' && isLBWDisabled) {
+                                                alert("LBW is disabled in match settings.");
+                                                return;
+                                            }
+                                            // We hijack shotCoordinates to pass wicket type for simplicity in processBall
+                                            processBall("W", type as any);
+                                            setShowWicketModal(false);
+                                        }}
+                                        className={cn(
+                                            "p-4 rounded-xl font-bold text-sm transition-all border",
+                                            type === 'LBW' && isLBWDisabled ? "opacity-20 cursor-not-allowed bg-neutral-900 border-neutral-800 text-neutral-600" : "bg-[#222] border-[#333] text-white hover:bg-red-600/20 hover:border-red-500"
+                                        )}
+                                    >
+                                        {type}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </main >
             {/* Wagon Wheel Input Modal */}
             <AnimatePresence>
