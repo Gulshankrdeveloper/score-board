@@ -410,11 +410,11 @@ export default function CricketPage() {
 
     // Handle Match Completion Sync
     useEffect(() => {
-        if (showMatchResultModal && (isCloudSyncEnabled || activeTournamentMatchId) && userRole === 'scorer') {
+        if (showMatchResultModal && userRole === 'scorer') {
             const matchId = activeTournamentMatchId || "local-match-" + teamAName.replace(/\s+/g, '-') + "-" + teamBName.replace(/\s+/g, '-');
             syncMatchToCloud(matchId, { status: 'Completed' });
         }
-    }, [showMatchResultModal, isCloudSyncEnabled, userRole, activeTournamentMatchId, teamAName, teamBName]);
+    }, [showMatchResultModal, userRole, activeTournamentMatchId, teamAName, teamBName]);
 
     // Viewer Sync Subscription
     useEffect(() => {
@@ -445,7 +445,7 @@ export default function CricketPage() {
 
     // Cloud Sync Effect
     useEffect(() => {
-        if ((isCloudSyncEnabled || activeTournamentMatchId) && gameState === 'playing' && userRole === 'scorer') {
+        if (gameState === 'playing' && userRole === 'scorer') {
             const matchId = activeTournamentMatchId || "local-match-" + teamAName.replace(/\s+/g, '-') + "-" + teamBName.replace(/\s+/g, '-');
 
             const syncData: Partial<SyncMatchData> = {
@@ -1537,6 +1537,7 @@ export default function CricketPage() {
                                                     key={match.id}
                                                     onClick={() => {
                                                         setActiveTournamentMatchId(match.id);
+                                                        setUserRole('viewer');
                                                         setGameState("playing");
                                                         setViewMode("match");
                                                     }}
@@ -1709,46 +1710,123 @@ export default function CricketPage() {
                                 <>
                                     {/* Local: LIVE */}
                                     {activeSubTab === 'live' && (
-                                        gameState === 'setup' || gameState === 'tournament-setup' ? (
-                                            <div className="flex flex-col items-center justify-center py-12 text-neutral-500">
-                                                <div className="bg-neutral-900 p-4 rounded-full mb-4 opacity-50"><Play size={24} /></div>
-                                                <p className="text-sm">No match currently in progress.</p>
-                                                <p className="text-xs mt-2">Start a new match as Scorer.</p>
-                                            </div>
-                                        ) : (
-                                            <div
-                                                onClick={() => setViewMode('match')}
-                                                className="bg-gradient-to-br from-neutral-900 to-neutral-800 border border-neutral-800 rounded-2xl p-5 active:scale-95 transition-transform cursor-pointer hover:border-red-500/30 shadow-lg relative overflow-hidden group"
-                                            >
-                                                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                                                    <Play size={48} className="text-white transform rotate-12" />
-                                                </div>
-                                                <div className="flex justify-between items-start mb-6">
-                                                    <span className="bg-red-500/20 text-red-400 text-[10px] font-bold px-3 py-1 rounded-full border border-red-500/20 flex items-center gap-1">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> LIVE
-                                                    </span>
-                                                    <span className="text-xs text-neutral-400 font-medium">Local Match</span>
-                                                </div>
-                                                <div className="flex justify-between items-end mb-2">
-                                                    <div>
-                                                        <div className="text-sm text-neutral-400 mb-1">Batting</div>
-                                                        <div className="font-bold text-2xl text-white leading-none">{currentBattingTeam.name}</div>
+                                        <>
+                                            {!(gameState === 'setup' || gameState === 'tournament-setup') && (
+                                                <div
+                                                    onClick={() => setViewMode('match')}
+                                                    className="bg-gradient-to-br from-neutral-900 to-neutral-800 border border-neutral-800 rounded-2xl p-5 mb-4 active:scale-95 transition-transform cursor-pointer hover:border-red-500/30 shadow-lg relative overflow-hidden group"
+                                                >
+                                                    <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                                                        <Play size={48} className="text-white transform rotate-12" />
                                                     </div>
-                                                    <div className="text-right">
-                                                        <div className="text-3xl font-black text-white leading-none">{totalRuns}/{totalWickets}</div>
-                                                        <div className="text-xs text-neutral-400 mt-1">{overs}.{ballsInOver} Overs</div>
+                                                    <div className="flex justify-between items-start mb-6">
+                                                        <span className="bg-red-500/20 text-red-400 text-[10px] font-bold px-3 py-1 rounded-full border border-red-500/20 flex items-center gap-1">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> YOUR MATCH
+                                                        </span>
+                                                        <span className="text-xs text-neutral-400 font-medium">Local Match</span>
                                                     </div>
-                                                </div>
-                                                <div className="mt-4 pt-3 border-t border-white/5 flex justify-between items-center">
-                                                    <div className="text-xs text-neutral-400">
-                                                        Target: <span className="text-white font-bold">{targetRuns || '-'}</span>
+                                                    <div className="flex justify-between items-end mb-2">
+                                                        <div>
+                                                            <div className="text-sm text-neutral-400 mb-1">Batting</div>
+                                                            <div className="font-bold text-2xl text-white leading-none">{currentBattingTeam.name}</div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="text-3xl font-black text-white leading-none">{totalRuns}/{totalWickets}</div>
+                                                            <div className="text-xs text-neutral-400 mt-1">{overs}.{ballsInOver} Overs</div>
+                                                        </div>
                                                     </div>
-                                                    <div className="text-xs text-blue-400 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                                                        Watch <ChevronLeft className="rotate-180" size={12} />
+                                                    <div className="mt-4 pt-3 border-t border-white/5 flex justify-between items-center">
+                                                        <div className="text-xs text-neutral-400">
+                                                            Target: <span className="text-white font-bold">{targetRuns || '-'}</span>
+                                                        </div>
+                                                        <div className="text-xs text-blue-400 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                                                            Resume <ChevronLeft className="rotate-180" size={12} />
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        )
+                                            )}
+
+                                            {communityMatches.length === 0 ? (
+                                                <div className="flex flex-col items-center justify-center py-12 text-neutral-500">
+                                                    <div className="bg-neutral-900 p-4 rounded-full mb-4 opacity-50"><Play size={24} /></div>
+                                                    <p className="text-sm">No live matches in progress right now.</p>
+                                                    <p className="text-xs mt-2">Start a new match as Scorer!</p>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-4">
+                                                    <h3 className="text-[10px] font-bold text-blue-400 uppercase tracking-widest px-1">Live from others</h3>
+                                                    {communityMatches.map((match) => (
+                                                        <div
+                                                            key={match.id}
+                                                            onClick={() => {
+                                                                setActiveTournamentMatchId(match.id);
+                                                                setUserRole('viewer');
+                                                                setGameState("playing");
+                                                                setViewMode("match");
+                                                            }}
+                                                            className="bg-[#0f0f0f] border border-neutral-800 rounded-2xl p-5 shadow-lg relative overflow-hidden group cursor-pointer hover:border-blue-500/30 transition-all active:scale-[0.98]"
+                                                        >
+                                                            <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/10 rounded-full blur-2xl -mr-5 -mt-5 pointer-events-none"></div>
+
+                                                            <div className="flex justify-between items-start mb-4 relative">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="bg-blue-500/20 text-blue-500 text-[10px] font-bold px-2 py-0.5 rounded-full border border-blue-500/20 flex items-center gap-1">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span> LIVE
+                                                                    </span>
+                                                                    <span className="text-xs text-neutral-500">Scorer Match</span>
+                                                                </div>
+                                                                <div className="text-[10px] text-neutral-600 font-mono">
+                                                                    {match.updatedAt?.seconds ? new Date(match.updatedAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Live'}
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex justify-between items-center px-2">
+                                                                <div className="flex flex-col items-center gap-2">
+                                                                    <div className="w-12 h-12 rounded-full bg-neutral-800 border-2 border-neutral-700 flex items-center justify-center text-lg font-black text-white shadow-xl relative overflow-hidden group-hover:border-blue-500/50 transition-colors">
+                                                                        {match.teamA?.name?.substring(0, 1).toUpperCase() || "T"}
+                                                                    </div>
+                                                                    <div className="text-center">
+                                                                        <div className="font-bold text-xs text-neutral-300 truncate w-20">{match.teamA?.name}</div>
+                                                                        <div className="text-[10px] font-black text-white mt-0.5">
+                                                                            {match.teamAScore?.runs}/{match.teamAScore?.wickets}
+                                                                        </div>
+                                                                        <div className="text-[8px] text-neutral-500 font-mono">
+                                                                            ({Math.floor((match.teamAScore?.balls || 0) / 6)}.{(match.teamAScore?.balls || 0) % 6} ov)
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="flex flex-col items-center">
+                                                                    <div className="text-xs font-black text-blue-500/50 mb-1">VS</div>
+                                                                    <div className="px-2 py-0.5 bg-neutral-800 rounded text-[8px] font-bold text-neutral-500 uppercase tracking-tighter">
+                                                                        {match.innings === 1 ? '1st Innings' : '2nd Innings'}
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="flex flex-col items-center gap-2">
+                                                                    <div className="w-12 h-12 rounded-full bg-neutral-800 border-2 border-neutral-700 flex items-center justify-center text-lg font-black text-white shadow-xl relative overflow-hidden group-hover:border-blue-500/50 transition-colors">
+                                                                        {match.teamB?.name?.substring(0, 1).toUpperCase() || "T"}
+                                                                    </div>
+                                                                    <div className="text-center">
+                                                                        <div className="font-bold text-xs text-neutral-300 truncate w-20">{match.teamB?.name}</div>
+                                                                        <div className="text-[10px] font-black text-white mt-0.5">
+                                                                            {match.teamBScore?.runs}/{match.teamBScore?.wickets}
+                                                                        </div>
+                                                                        <div className="text-[8px] text-neutral-500 font-mono">
+                                                                            ({Math.floor((match.teamBScore?.balls || 0) / 6)}.{(match.teamBScore?.balls || 0) % 6} ov)
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <button className="w-full mt-4 py-2 bg-neutral-900 border border-neutral-800 rounded-xl text-[10px] font-bold text-neutral-400 uppercase tracking-widest group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-500 transition-all">
+                                                                Watch Live Scorecard
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </>
                                     )}
 
                                     {/* Local: UPCOMING */}
