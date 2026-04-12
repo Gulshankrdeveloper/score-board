@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -410,7 +410,7 @@ export default function CricketPage() {
 
     // Handle Match Completion Sync
     useEffect(() => {
-        if (showMatchResultModal && isCloudSyncEnabled && userRole === 'scorer') {
+        if (showMatchResultModal && (isCloudSyncEnabled || activeTournamentMatchId) && userRole === 'scorer') {
             const matchId = activeTournamentMatchId || "local-match-" + teamAName.replace(/\s+/g, '-') + "-" + teamBName.replace(/\s+/g, '-');
             syncMatchToCloud(matchId, { status: 'Completed' });
         }
@@ -445,7 +445,7 @@ export default function CricketPage() {
 
     // Cloud Sync Effect
     useEffect(() => {
-        if (isCloudSyncEnabled && gameState === 'playing' && userRole === 'scorer') {
+        if ((isCloudSyncEnabled || activeTournamentMatchId) && gameState === 'playing' && userRole === 'scorer') {
             const matchId = activeTournamentMatchId || "local-match-" + teamAName.replace(/\s+/g, '-') + "-" + teamBName.replace(/\s+/g, '-');
 
             const syncData: Partial<SyncMatchData> = {
