@@ -3158,10 +3158,29 @@ export default function CricketPage() {
                                 setViewMode('dashboard');
                             } else {
                                 // Scorer Exit Logic
-                                const confirmExit = window.confirm("Do you want to end this match and return to setup?");
-                                if (confirmExit) {
-                                    setGameState("setup");
+                                const confirmSave = window.confirm("Do you want to save this match to Results History before exiting?\n(OK = Save | Cancel = Options)");
+                                
+                                const matchId = activeTournamentMatchId || "local-match-" + teamAName.replace(/\s+/g, '-') + "-" + teamBName.replace(/\s+/g, '-');
+                                
+                                if (confirmSave) {
+                                    // Mark completed on cloud to remove from Live maps
+                                    syncMatchToCloud(matchId, { status: 'Completed' });
+                                    
+                                    saveMatch();
                                     setUserRole(null);
+                                    setViewMode('dashboard');
+                                    setActiveTab('local');
+                                    setActiveSubTab('completed');
+                                } else {
+                                    const confirmAbort = window.confirm("Do you want to ABORT and discard this match without saving?");
+                                    if (confirmAbort) {
+                                        // Mark completed on cloud to remove from Live maps
+                                        syncMatchToCloud(matchId, { status: 'Completed' });
+                                        
+                                        setGameState("setup");
+                                        setUserRole(null);
+                                        setViewMode('dashboard');
+                                    }
                                 }
                             }
                         }}
