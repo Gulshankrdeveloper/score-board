@@ -5,8 +5,6 @@ import { Trophy, Crown, Activity, Target } from "lucide-react"; // Using availab
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { CricketBackground } from "@/components/CricketBackground";
-import { SplashScreen } from "@/components/SplashScreen";
-import { useState, useEffect } from "react";
 
 const games = [
     {
@@ -44,11 +42,6 @@ const games = [
 ];
 
 export default function Home() {
-    const [isLoading, setIsLoading] = useState(true);
-
-    if (isLoading) {
-        return <SplashScreen onFinish={() => setIsLoading(false)} />;
-    }
 
     return (
         <main className="flex min-h-screen flex-col items-center justify-center p-8 md:p-24 relative overflow-hidden">
