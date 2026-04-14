@@ -4,7 +4,8 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { Trophy, Mail, Lock, ArrowRight, Loader2, AlertCircle } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { Trophy, Mail, Lock, ArrowRight, Loader2, AlertCircle, WifiOff } from "lucide-react";
 
 export function AuthScreen() {
     const [isLogin, setIsLogin] = useState(true);
@@ -12,6 +13,7 @@ export function AuthScreen() {
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const { loginAsGuest } = useAuth();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -144,6 +146,17 @@ export function AuthScreen() {
                                 {isLogin ? "Sign Up" : "Sign In"}
                             </button>
                         </p>
+                    </div>
+
+                    <div className="mt-5 text-center">
+                        <button
+                            type="button"
+                            onClick={loginAsGuest}
+                            className="text-xs text-neutral-600 hover:text-neutral-400 flex items-center justify-center gap-1.5 mx-auto font-medium transition-colors p-2 rounded-lg hover:bg-neutral-900/50"
+                            title="Ignores Firebase & allows local scoring features"
+                        >
+                            <WifiOff size={14} /> Continue without Cloud Sync (Local Mode)
+                        </button>
                     </div>
                 </div>
                 
