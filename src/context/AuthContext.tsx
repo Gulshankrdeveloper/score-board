@@ -24,17 +24,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     useEffect(() => {
         let unsubscribe = () => {};
-        try {
-            unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-                if (!currentUser && typeof window !== 'undefined' && localStorage.getItem('isGuest') === 'true') {
+        if (auth) {
+            try {
+                unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+                    if (!currentUser && typeof window !== 'undefined' && localStorage.getItem('isGuest') === 'true') {
+                        setUser({ uid: 'guest', email: 'Guest User (Local)' } as any);
+                    } else {
+                        setUser(currentUser);
+                    }
+                    setLoading(false);
+                });
+            } catch (e) {
+                console.error("Firebase Auth Init Error:", e);
+                if (typeof window !== 'undefined' && localStorage.getItem('isGuest') === 'true') {
                     setUser({ uid: 'guest', email: 'Guest User (Local)' } as any);
-                } else {
-                    setUser(currentUser);
                 }
                 setLoading(false);
-            });
-        } catch (e) {
-            console.error("Firebase Auth Init Error:", e);
+            }
+        } else {
+            // Firebase not configured, check for guest mode or just stop loading
             if (typeof window !== 'undefined' && localStorage.getItem('isGuest') === 'true') {
                 setUser({ uid: 'guest', email: 'Guest User (Local)' } as any);
             }
@@ -53,7 +61,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const signOut = async () => {
         try {
-            await firebaseSignOut(auth);
+            if (auth) {
+                await firebaseSignOut(auth);
+            }
         } catch (error) {
             console.error("Error signing out:", error);
         } finally {
