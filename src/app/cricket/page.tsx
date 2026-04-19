@@ -160,6 +160,7 @@ import LoginModal from "@/components/LoginModal";
 import PartnershipCard from "@/components/PartnershipCard";
 import WormGraph from "@/components/WormGraph";
 
+
 export default function CricketPage() {
     // --- Game Config State ---
     const [gameState, setGameState] = useState<GameState>("setup");
@@ -2034,20 +2035,20 @@ export default function CricketPage() {
 
     if (gameState === "setup") {
         return (
-            <div className="min-h-screen bg-neutral-950 text-white p-4 md:p-8 flex flex-col items-center max-w-4xl mx-auto">
-                <h1 className="text-3xl font-bold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-500">Match Setup</h1>
+            <div className="min-h-screen bg-neutral-950 text-white p-3 md:p-8 flex flex-col items-center max-w-4xl mx-auto overflow-x-hidden">
+                <h1 className="text-2xl md:text-3xl font-black mb-6 md:mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-500 uppercase tracking-tighter">Match Setup</h1>
 
                 {/* History & Stats Buttons */}
-                <div className="w-full flex justify-between mb-4 gap-2">
-                    <Link href="/" className="text-neutral-400 hover:text-white flex items-center gap-2 text-sm border border-neutral-800 px-4 py-2 rounded-lg hover:bg-neutral-900 transition-colors">
-                        <ChevronLeft size={16} /> Back
+                <div className="w-full flex flex-wrap justify-between mb-4 gap-2">
+                    <Link href="/" className="text-neutral-400 hover:text-white flex items-center gap-1 md:gap-2 text-[10px] md:text-sm border border-neutral-800 px-3 md:px-4 py-2 rounded-lg hover:bg-neutral-900 transition-colors">
+                        <ChevronLeft size={14} /> <span className="hidden xs:inline">Back</span>
                     </Link>
                     <div className="flex gap-2">
-                        <button onClick={() => setViewMode(viewMode === 'stats' ? 'dashboard' : 'stats')} className={cn("flex items-center gap-2 text-sm border px-4 py-2 rounded-lg transition-colors", viewMode === 'stats' ? "bg-yellow-600 border-yellow-500 text-white" : "border-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-900")}>
-                            <Users size={16} /> {viewMode === 'stats' ? 'Back to Setup' : 'Career Stats'}
+                        <button onClick={() => setViewMode(viewMode === 'stats' ? 'dashboard' : 'stats')} className={cn("flex items-center gap-1 md:gap-2 text-[10px] md:text-sm border px-3 md:px-4 py-2 rounded-lg transition-colors", viewMode === 'stats' ? "bg-yellow-600 border-yellow-500 text-white" : "border-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-900")}>
+                            <Users size={14} /> {viewMode === 'stats' ? 'Setup' : 'Career'}
                         </button>
-                        <button onClick={() => setGameState("history")} className="text-neutral-400 hover:text-white flex items-center gap-2 text-sm border border-neutral-800 px-4 py-2 rounded-lg hover:bg-neutral-900 transition-colors">
-                            <RotateCcw size={16} /> History
+                        <button onClick={() => setGameState("history")} className="text-neutral-400 hover:text-white flex items-center gap-1 md:gap-2 text-[10px] md:text-sm border border-neutral-800 px-3 md:px-4 py-2 rounded-lg hover:bg-neutral-900 transition-colors">
+                            <RotateCcw size={14} /> History
                         </button>
                     </div>
                 </div>
@@ -2075,7 +2076,50 @@ export default function CricketPage() {
                 )}
 
                 {viewMode === 'stats' ? (
-                    <div className="w-full max-w-5xl animate-in fade-in slide-in-from-bottom-4">
+                    <div className="w-full max-w-5xl animate-in fade-in slide-in-from-bottom-4 space-y-6">
+                        
+                        {/* Tournament Leaderboards (Orange / Purple Cap) */}
+                        {playerStats && playerStats.length > 0 && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {(() => {
+                                    const topScorer = [...playerStats].sort((a,b) => b.runs - a.runs)[0];
+                                    if (!topScorer || topScorer.runs === 0) return null;
+                                    return (
+                                        <div className="bg-gradient-to-r from-orange-600/20 to-[#121212] border border-orange-500/30 p-4 rounded-2xl flex items-center gap-4 group hover:border-orange-500/60 transition-colors">
+                                            <div className="w-14 h-14 bg-orange-500/10 rounded-full flex items-center justify-center text-orange-500 border border-orange-500/30 shadow-[0_0_15px_rgba(249,115,22,0.1)] group-hover:shadow-[0_0_20px_rgba(249,115,22,0.3)] transition-all">
+                                                <Trophy size={24} />
+                                            </div>
+                                            <div>
+                                                <div className="text-[10px] text-orange-400 font-bold uppercase tracking-widest flex items-center gap-1">
+                                                    <span>🟠</span> ORANGE CAP
+                                                </div>
+                                                <div className="text-xl font-black text-white">{topScorer.name}</div>
+                                                <div className="text-sm font-bold text-orange-300">{topScorer.runs} Runs <span className="text-neutral-500 font-normal">in {topScorer.matches} Mat</span></div>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+                                {(() => {
+                                    const topWicketTaker = [...playerStats].sort((a,b) => b.wickets - a.wickets)[0];
+                                    if (!topWicketTaker || topWicketTaker.wickets === 0) return null;
+                                    return (
+                                        <div className="bg-gradient-to-r from-purple-600/20 to-[#121212] border border-purple-500/30 p-4 rounded-2xl flex items-center gap-4 group hover:border-purple-500/60 transition-colors">
+                                            <div className="w-14 h-14 bg-purple-500/10 rounded-full flex items-center justify-center text-purple-500 border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.1)] group-hover:shadow-[0_0_20px_rgba(168,85,247,0.3)] transition-all">
+                                                <Target size={24} />
+                                            </div>
+                                            <div>
+                                                <div className="text-[10px] text-purple-400 font-bold uppercase tracking-widest flex items-center gap-1">
+                                                    <span>🟣</span> PURPLE CAP
+                                                </div>
+                                                <div className="text-xl font-black text-white">{topWicketTaker.name}</div>
+                                                <div className="text-sm font-bold text-purple-300">{topWicketTaker.wickets} Wickets <span className="text-neutral-500 font-normal">in {topWicketTaker.matches} Mat</span></div>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        )}
+
                         <div className="bg-[#1a1a1a] rounded-2xl border border-[#333] overflow-hidden shadow-2xl">
                             <div className="p-6 border-b border-[#333] bg-[#222] flex justify-between items-center">
                                 <h2 className="text-2xl font-bold flex items-center gap-2 text-white">
@@ -2104,9 +2148,22 @@ export default function CricketPage() {
                                         {(!playerStats || playerStats.length === 0) ? (
                                             <tr><td colSpan={10} className="p-8 text-center text-neutral-500 italic">No stats available yet. Play matches to build careers!</td></tr>
                                         ) : (
-                                            playerStats.map((p, i) => (
-                                                <tr key={i} className="hover:bg-[#222] transition-colors group">
-                                                    <td className="p-4 font-bold text-white group-hover:text-yellow-500 transition-colors">{p.name}</td>
+                                            playerStats.map((p, i) => {
+                                                const highestScore = p.highestScore || 0;
+                                                const isCenturion = highestScore >= 100;
+                                                const isHalfCenturion = highestScore >= 50 && highestScore < 100;
+                                                const isFifer = p.bestBowling && parseInt(p.bestBowling.split('/')[0]) >= 5;
+
+                                                return (
+                                                    <tr key={i} className="hover:bg-[#222] transition-colors group">
+                                                        <td className="p-4 font-bold text-white group-hover:text-yellow-500 transition-colors flex items-center gap-2">
+                                                            {p.name}
+                                                            <div className="flex gap-0.5" title="Achievements">
+                                                                {isCenturion && <span title="Centurion (100+ Score)">⭐️</span>}
+                                                                {!isCenturion && isHalfCenturion && <span title="Half-Centurion (50+ Score)">🌟</span>}
+                                                                {isFifer && <span title="Fifer (5+ Wickets)">🔥</span>}
+                                                            </div>
+                                                        </td>
                                                     <td className="p-4 text-right text-neutral-400">{p.matches}</td>
                                                     <td className="p-4 text-right text-neutral-500">{p.innings}</td>
                                                     <td className="p-4 text-right text-white font-black text-base">{p.runs}</td>
@@ -2125,7 +2182,8 @@ export default function CricketPage() {
                                                         {p.bestBowling}
                                                     </td>
                                                 </tr>
-                                            ))
+                                                );
+                                            })
                                         )}
                                     </tbody>
                                 </table>
@@ -2139,17 +2197,17 @@ export default function CricketPage() {
                             <div className="hidden md:flex absolute left-1/2 top-10 -translate-x-1/2 -translate-y-1/2 z-10 w-14 h-14 bg-neutral-950 border-4 border-neutral-800 rounded-full items-center justify-center text-neutral-500 font-black italic shadow-2xl shadow-black/50">VS</div>
 
                             {/* Team A Setup */}
-                            <div className="flex-1 bg-gradient-to-br from-neutral-900 to-[#121212] p-6 lg:p-8 rounded-3xl border border-neutral-800 shadow-xl relative overflow-hidden group focus-within:border-blue-500/50 transition-colors">
+                            <div className="flex-1 bg-gradient-to-br from-neutral-900 to-[#121212] p-4 md:p-6 lg:p-8 rounded-2xl md:rounded-3xl border border-neutral-800 shadow-xl relative overflow-hidden group focus-within:border-blue-500/50 transition-colors">
                                 <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px] -mr-20 -mt-20 pointer-events-none group-focus-within:bg-blue-500/20 transition-all"></div>
                                 
-                                <div className="flex items-center gap-4 mb-8 relative">
-                                    <div className="w-12 h-12 bg-blue-500/10 rounded-[14px] flex items-center justify-center text-blue-500 border border-blue-500/20 shadow-inner group-focus-within:bg-blue-500 group-focus-within:text-white transition-colors">
-                                        <Users size={24} />
+                                <div className="flex items-center gap-3 md:gap-4 mb-6 md:mb-8 relative">
+                                    <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-500/10 rounded-[12px] md:rounded-[14px] flex items-center justify-center text-blue-500 border border-blue-500/20 shadow-inner group-focus-within:bg-blue-500 group-focus-within:text-white transition-colors">
+                                        <Users size={20} className="md:w-6 md:h-6" />
                                     </div>
                                     <div className="flex-1 relative">
-                                        <div className="text-[10px] text-blue-400 font-bold uppercase tracking-widest mb-1">Batting First</div>
+                                        <div className="text-[9px] md:text-[10px] text-blue-400 font-bold uppercase tracking-widest mb-0.5 md:mb-1">Batting First</div>
                                         <input
-                                            className="w-full bg-transparent text-2xl lg:text-3xl font-black text-white focus:outline-none placeholder:text-neutral-700 transition-colors caret-blue-500"
+                                            className="w-full bg-transparent text-xl md:text-2xl lg:text-3xl font-black text-white focus:outline-none placeholder:text-neutral-700 transition-colors caret-blue-500"
                                             value={teamAName}
                                             onChange={(e) => setTeamAName(e.target.value)}
                                             placeholder="Team A Name"
@@ -2158,12 +2216,12 @@ export default function CricketPage() {
                                     </div>
                                 </div>
 
-                                <div className="relative mb-6">
+                                <div className="relative mb-5 md:mb-6">
                                     <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-neutral-500">
-                                        <UserPlus size={18} />
+                                        <UserPlus size={16} className="md:w-[18px]" />
                                     </div>
                                     <input
-                                        className="w-full bg-black/40 border border-neutral-800 focus:border-blue-500/50 rounded-xl pl-12 pr-12 py-3.5 outline-none text-sm transition-all focus:bg-black/60 shadow-inner"
+                                        className="w-full bg-black/40 border border-neutral-800 focus:border-blue-500/50 rounded-xl pl-11 pr-12 py-3 md:py-3.5 outline-none text-xs md:text-sm transition-all focus:bg-black/60 shadow-inner"
                                         value={tempPlayerNameA}
                                         onChange={(e) => setTempPlayerNameA(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && addPlayer("A", tempPlayerNameA)}
@@ -2190,21 +2248,21 @@ export default function CricketPage() {
                                         teamA.players.map((p, idx) => (
                                             <div key={p.id} className="bg-black/20 hover:bg-neutral-800/80 p-2.5 rounded-xl border border-neutral-800/50 flex justify-between items-center group transition-colors relative overflow-hidden">
                                                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500/20 group-hover:bg-blue-500/80 transition-colors"></div>
-                                                <div className="flex items-center gap-3 pl-2">
-                                                    <div className="relative w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-neutral-700 to-neutral-800 flex items-center justify-center cursor-pointer group/avatar shadow-md">
+                                                <div className="flex items-center gap-2 md:gap-3 pl-1 md:pl-2">
+                                                    <div className="relative w-8 h-8 md:w-9 md:h-9 rounded-full overflow-hidden bg-gradient-to-br from-neutral-700 to-neutral-800 flex items-center justify-center cursor-pointer group/avatar shadow-md">
                                                         {p.photoUrl ? (
                                                             <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover group-hover/avatar:scale-110 transition-transform" />
                                                         ) : (
-                                                            <User size={16} className="text-neutral-500 group-hover/avatar:text-neutral-300 transition-colors" />
+                                                            <User size={14} className="md:w-4 md:h-4 text-neutral-500 group-hover/avatar:text-neutral-300 transition-colors" />
                                                         )}
                                                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
-                                                            <Upload size={12} className="text-white" />
+                                                            <Upload size={10} className="text-white" />
                                                         </div>
                                                         <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handlePlayerImageUpload(e, p.id)} />
                                                     </div>
                                                     <div>
-                                                        <span className="font-semibold text-neutral-200 text-sm group-hover:text-white transition-colors">{p.name}</span>
-                                                        <div className="text-[9px] text-neutral-600 font-mono">Player {idx + 1}</div>
+                                                        <span className="font-bold text-neutral-200 text-xs md:text-sm group-hover:text-white transition-colors truncate max-w-[100px] block">{p.name}</span>
+                                                        <div className="text-[8px] md:text-[9px] text-neutral-600 font-mono">ID {idx + 1}</div>
                                                     </div>
                                                 </div>
                                                 <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity pr-1">
@@ -2218,17 +2276,17 @@ export default function CricketPage() {
                             </div>
 
                             {/* Team B Setup */}
-                            <div className="flex-1 bg-gradient-to-bl from-neutral-900 to-[#121212] p-6 lg:p-8 rounded-3xl border border-neutral-800 shadow-xl relative overflow-hidden group focus-within:border-green-500/50 transition-colors">
+                            <div className="flex-1 bg-gradient-to-bl from-neutral-900 to-[#121212] p-4 md:p-6 lg:p-8 rounded-2xl md:rounded-3xl border border-neutral-800 shadow-xl relative overflow-hidden group focus-within:border-green-500/50 transition-colors">
                                 <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/10 rounded-full blur-[80px] -mr-20 -mt-20 pointer-events-none group-focus-within:bg-green-500/20 transition-all"></div>
                                 
-                                <div className="flex items-center gap-4 mb-8 relative md:flex-row-reverse flex-row">
-                                    <div className="w-12 h-12 bg-green-500/10 rounded-[14px] flex items-center justify-center text-green-500 border border-green-500/20 shadow-inner group-focus-within:bg-green-500 group-focus-within:text-white transition-colors">
-                                        <Users size={24} />
+                                <div className="flex items-center gap-3 md:gap-4 mb-6 md:mb-8 relative md:flex-row-reverse flex-row">
+                                    <div className="w-10 h-10 md:w-12 md:h-12 bg-green-500/10 rounded-[12px] md:rounded-[14px] flex items-center justify-center text-green-500 border border-green-500/20 shadow-inner group-focus-within:bg-green-500 group-focus-within:text-white transition-colors">
+                                        <Users size={20} className="md:w-6 md:h-6" />
                                     </div>
                                     <div className="flex-1 relative md:text-right text-left">
-                                        <div className="text-[10px] text-green-400 font-bold uppercase tracking-widest mb-1">Bowling First</div>
+                                        <div className="text-[9px] md:text-[10px] text-green-400 font-bold uppercase tracking-widest mb-0.5 md:mb-1">Bowling First</div>
                                         <input
-                                            className="w-full bg-transparent text-2xl lg:text-3xl font-black text-white focus:outline-none placeholder:text-neutral-700 transition-colors caret-green-500 md:text-right text-left"
+                                            className="w-full bg-transparent text-xl md:text-2xl lg:text-3xl font-black text-white focus:outline-none placeholder:text-neutral-700 transition-colors caret-green-500 md:text-right text-left"
                                             value={teamBName}
                                             onChange={(e) => setTeamBName(e.target.value)}
                                             placeholder="Team B Name"
@@ -2237,12 +2295,12 @@ export default function CricketPage() {
                                     </div>
                                 </div>
 
-                                <div className="relative mb-6">
+                                <div className="relative mb-5 md:mb-6">
                                     <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-neutral-500">
-                                        <UserPlus size={18} />
+                                        <UserPlus size={16} className="md:w-[18px]" />
                                     </div>
                                     <input
-                                        className="w-full bg-black/40 border border-neutral-800 focus:border-green-500/50 rounded-xl pl-12 pr-12 py-3.5 outline-none text-sm transition-all focus:bg-black/60 shadow-inner"
+                                        className="w-full bg-black/40 border border-neutral-800 focus:border-green-500/50 rounded-xl pl-11 pr-12 py-3 md:py-3.5 outline-none text-xs md:text-sm transition-all focus:bg-black/60 shadow-inner"
                                         value={tempPlayerNameB}
                                         onChange={(e) => setTempPlayerNameB(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && addPlayer("B", tempPlayerNameB)}
@@ -2263,21 +2321,21 @@ export default function CricketPage() {
                                         teamB.players.map((p, idx) => (
                                             <div key={p.id} className="bg-black/20 hover:bg-neutral-800/80 p-2.5 rounded-xl border border-neutral-800/50 flex justify-between items-center group transition-colors relative overflow-hidden">
                                                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500/20 group-hover:bg-green-500/80 transition-colors"></div>
-                                                <div className="flex items-center gap-3 pl-2">
-                                                    <div className="relative w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-neutral-700 to-neutral-800 flex items-center justify-center cursor-pointer group/avatar shadow-md">
+                                                <div className="flex items-center gap-2 md:gap-3 pl-1 md:pl-2">
+                                                    <div className="relative w-8 h-8 md:w-9 md:h-9 rounded-full overflow-hidden bg-gradient-to-br from-neutral-700 to-neutral-800 flex items-center justify-center cursor-pointer group/avatar shadow-md">
                                                         {p.photoUrl ? (
                                                             <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover group-hover/avatar:scale-110 transition-transform" />
                                                         ) : (
-                                                            <User size={16} className="text-neutral-500 group-hover/avatar:text-neutral-300 transition-colors" />
+                                                            <User size={14} className="md:w-4 md:h-4 text-neutral-500 group-hover/avatar:text-neutral-300 transition-colors" />
                                                         )}
                                                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
-                                                            <Upload size={12} className="text-white" />
+                                                            <Upload size={10} className="text-white" />
                                                         </div>
                                                         <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handlePlayerImageUpload(e, p.id)} />
                                                     </div>
                                                     <div>
-                                                        <span className="font-semibold text-neutral-200 text-sm group-hover:text-white transition-colors">{p.name}</span>
-                                                        <div className="text-[9px] text-neutral-600 font-mono">Player {idx + 1}</div>
+                                                        <span className="font-bold text-neutral-200 text-xs md:text-sm group-hover:text-white transition-colors truncate max-w-[100px] block">{p.name}</span>
+                                                        <div className="text-[8px] md:text-[9px] text-neutral-600 font-mono">ID {idx + 1}</div>
                                                     </div>
                                                 </div>
                                                 <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity pr-1">
@@ -2292,28 +2350,28 @@ export default function CricketPage() {
                         </div>
 
                         {/* Match Settings */}
-                        <div className="w-full max-w-4xl mt-8 bg-gradient-to-tr from-neutral-900 to-[#181818] p-6 lg:p-8 rounded-3xl border border-neutral-800 relative shadow-xl">
+                        <div className="w-full max-w-4xl mt-6 md:mt-8 bg-gradient-to-tr from-neutral-900 to-[#181818] p-4 md:p-6 lg:p-8 rounded-2xl md:rounded-3xl border border-neutral-800 relative shadow-xl">
                             {activeTournamentMatchId && (
-                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-yellow-500 to-orange-500 px-6 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl shadow-orange-500/20 text-black">
+                                <div className="absolute -top-3 md:-top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-yellow-500 to-orange-500 px-4 md:px-6 py-1 md:py-1.5 rounded-full text-[8px] md:text-[10px] font-black uppercase tracking-widest shadow-xl shadow-orange-500/20 text-black">
                                     🏆 Tournament Match
                                 </div>
                             )}
-                            <div className="flex justify-between items-center mb-8 border-b border-neutral-800 pb-4">
-                                <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                    <Settings size={20} className="text-blue-500" /> Match Configuration
+                            <div className="flex flex-col sm:flex-row justify-between items-center mb-6 md:mb-8 border-b border-neutral-800 pb-4 gap-4">
+                                <h3 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
+                                    <Settings size={18} className="text-blue-500 md:w-5 md:h-5" /> Match Config
                                 </h3>
-                                <div className="flex bg-black/50 p-1 rounded-xl border border-neutral-800 shadow-inner">
-                                    <button onClick={() => changeLang('en')} className={cn("px-4 py-1.5 rounded-lg text-xs font-black transition-all", lang === 'en' ? "bg-blue-600 text-white shadow-lg" : "text-neutral-500 hover:text-white hover:bg-neutral-800/50")}>ENGLISH</button>
-                                    <button onClick={() => changeLang('hi')} className={cn("px-4 py-1.5 rounded-lg text-xs font-black transition-all", lang === 'hi' ? "bg-orange-600 text-white shadow-lg" : "text-neutral-500 hover:text-white hover:bg-neutral-800/50")}>HINDI</button>
+                                <div className="flex bg-black/50 p-1 rounded-xl border border-neutral-800 shadow-inner scale-90 sm:scale-100">
+                                    <button onClick={() => changeLang('en')} className={cn("px-4 py-1.5 rounded-lg text-[10px] md:text-xs font-black transition-all", lang === 'en' ? "bg-blue-600 text-white shadow-lg" : "text-neutral-500 hover:text-white hover:bg-neutral-800/50")}>ENGLISH</button>
+                                    <button onClick={() => changeLang('hi')} className={cn("px-4 py-1.5 rounded-lg text-[10px] md:text-xs font-black transition-all", lang === 'hi' ? "bg-orange-600 text-white shadow-lg" : "text-neutral-500 hover:text-white hover:bg-neutral-800/50")}>HINDI</button>
                                 </div>
                             </div>
 
                             <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
-                                <div className="space-y-8">
+                                <div className="space-y-6 md:space-y-8">
                                     <div>
-                                        <div className="flex justify-between items-end mb-3">
-                                            <label className="text-neutral-400 text-xs font-bold uppercase tracking-widest">Total Overs</label>
-                                            <span className="text-blue-400 font-black text-2xl leading-none">{totalOvers}</span>
+                                        <div className="flex justify-between items-end mb-2 md:mb-3">
+                                            <label className="text-neutral-400 text-[10px] md:text-xs font-bold uppercase tracking-widest">Total Overs</label>
+                                            <span className="text-blue-400 font-black text-xl md:text-2xl leading-none">{totalOvers}</span>
                                         </div>
                                         <input
                                             type="range"
@@ -2321,14 +2379,14 @@ export default function CricketPage() {
                                             max="20"
                                             value={totalOvers}
                                             onChange={(e) => setTotalOvers(parseInt(e.target.value))}
-                                            className="w-full h-2 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-all"
+                                            className="w-full h-1.5 md:h-2 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-all"
                                             style={{ boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)' }}
                                         />
                                     </div>
                                     <div>
-                                        <div className="flex justify-between items-end mb-3">
-                                            <label className="text-neutral-400 text-xs font-bold uppercase tracking-widest">Powerplay Overs</label>
-                                            <span className="text-yellow-500 font-black text-2xl leading-none">{powerplayOvers}</span>
+                                        <div className="flex justify-between items-end mb-2 md:mb-3">
+                                            <label className="text-neutral-400 text-[10px] md:text-xs font-bold uppercase tracking-widest">Powerplay</label>
+                                            <span className="text-yellow-500 font-black text-xl md:text-2xl leading-none">{powerplayOvers}</span>
                                         </div>
                                         <input
                                             type="range"
@@ -2336,39 +2394,39 @@ export default function CricketPage() {
                                             max={Math.floor(totalOvers / 2)}
                                             value={powerplayOvers}
                                             onChange={(e) => setPowerplayOvers(parseInt(e.target.value))}
-                                            className="w-full h-2 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-yellow-500 hover:accent-yellow-400 transition-all"
+                                            className="w-full h-1.5 md:h-2 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-yellow-500 hover:accent-yellow-400 transition-all"
                                             style={{ boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)' }}
                                         />
                                     </div>
                                 </div>
 
-                                <div className="space-y-4">
+                                <div className="space-y-3 md:space-y-4">
                                     <button
                                         onClick={() => setIsFreeHitEnabled(!isFreeHitEnabled)}
-                                        className={cn("w-full p-4 rounded-2xl border flex justify-between items-center transition-all group", isFreeHitEnabled ? "bg-blue-500/10 border-blue-500/50 text-white shadow-[0_0_15px_rgba(59,130,246,0.1)]" : "bg-black/30 border-neutral-800 text-neutral-500 hover:border-neutral-700")}
+                                        className={cn("w-full p-3 md:p-4 rounded-xl md:rounded-2xl border flex justify-between items-center transition-all group", isFreeHitEnabled ? "bg-blue-500/10 border-blue-500/50 text-white shadow-[0_0_15px_rgba(59,130,246,0.1)]" : "bg-black/30 border-neutral-800 text-neutral-500 hover:border-neutral-700")}
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <div className={cn("p-2 rounded-lg transition-colors", isFreeHitEnabled ? "bg-blue-500/20 text-blue-400" : "bg-neutral-800 text-neutral-600")}>
-                                                <Target size={16} />
+                                        <div className="flex items-center gap-2 md:gap-3 text-left">
+                                            <div className={cn("p-1.5 md:p-2 rounded-lg transition-colors", isFreeHitEnabled ? "bg-blue-500/20 text-blue-400" : "bg-neutral-800 text-neutral-600")}>
+                                                <Target size={14} className="md:w-4 md:h-4" />
                                             </div>
-                                            <span className="font-bold text-sm tracking-wide">Free Hit for No Balls</span>
+                                            <span className="font-bold text-[10px] md:text-sm tracking-wide">Free Hit Rule</span>
                                         </div>
-                                        <div className={cn("w-10 h-5 rounded-full relative transition-colors", isFreeHitEnabled ? "bg-blue-500" : "bg-neutral-800")}>
-                                            <div className={cn("absolute top-0.5 bottom-0.5 w-4 bg-white rounded-full transition-all shadow-sm", isFreeHitEnabled ? "right-0.5" : "left-0.5")}></div>
+                                        <div className={cn("w-8 md:w-10 h-4 md:h-5 rounded-full relative transition-colors", isFreeHitEnabled ? "bg-blue-500" : "bg-neutral-800")}>
+                                            <div className={cn("absolute top-0.5 bottom-0.5 w-3 md:w-4 bg-white rounded-full transition-all shadow-sm", isFreeHitEnabled ? "right-0.5" : "left-0.5")}></div>
                                         </div>
                                     </button>
                                     <button
                                         onClick={() => setIsLBWDisabled(!isLBWDisabled)}
-                                        className={cn("w-full p-4 rounded-2xl border flex justify-between items-center transition-all group", !isLBWDisabled ? "bg-green-500/10 border-green-500/50 text-white shadow-[0_0_15px_rgba(34,197,94,0.1)]" : "bg-black/30 border-neutral-800 text-neutral-500 hover:border-neutral-700")}
+                                        className={cn("w-full p-3 md:p-4 rounded-xl md:rounded-2xl border flex justify-between items-center transition-all group", !isLBWDisabled ? "bg-green-500/10 border-green-500/50 text-white shadow-[0_0_15px_rgba(34,197,94,0.1)]" : "bg-black/30 border-neutral-800 text-neutral-500 hover:border-neutral-700")}
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <div className={cn("p-2 rounded-lg transition-colors", !isLBWDisabled ? "bg-green-500/20 text-green-400" : "bg-neutral-800 text-neutral-600")}>
-                                                <Shield size={16} />
+                                        <div className="flex items-center gap-2 md:gap-3 text-left">
+                                            <div className={cn("p-1.5 md:p-2 rounded-lg transition-colors", !isLBWDisabled ? "bg-green-500/20 text-green-400" : "bg-neutral-800 text-neutral-600")}>
+                                                <Shield size={14} className="md:w-4 md:h-4" />
                                             </div>
-                                            <span className="font-bold text-sm tracking-wide">LBW Rule (Enabled)</span>
+                                            <span className="font-bold text-[10px] md:text-sm tracking-wide">LBW Rule Status</span>
                                         </div>
-                                        <div className={cn("w-10 h-5 rounded-full relative transition-colors", !isLBWDisabled ? "bg-green-500" : "bg-neutral-800")}>
-                                            <div className={cn("absolute top-0.5 bottom-0.5 w-4 bg-white rounded-full transition-all shadow-sm", !isLBWDisabled ? "right-0.5" : "left-0.5")}></div>
+                                        <div className={cn("w-8 md:w-10 h-4 md:h-5 rounded-full relative transition-colors", !isLBWDisabled ? "bg-green-500" : "bg-neutral-800")}>
+                                            <div className={cn("absolute top-0.5 bottom-0.5 w-3 md:w-4 bg-white rounded-full transition-all shadow-sm", !isLBWDisabled ? "right-0.5" : "left-0.5")}></div>
                                         </div>
                                     </button>
                                 </div>
@@ -2387,11 +2445,11 @@ export default function CricketPage() {
                             </button>
                         )}
 
-                        <div className="flex flex-col gap-4 items-center mt-8 w-full max-w-sm mb-12">
+                        <div className="flex flex-col gap-4 items-center mt-6 md:mt-8 w-full max-w-sm mb-12">
                             <button
                                 onClick={startGame}
                                 disabled={teamA.players.length !== 11 || teamB.players.length !== 11}
-                                className={cn("w-full py-5 rounded-2xl font-black text-xl flex items-center gap-3 justify-center transition-all shadow-2xl relative overflow-hidden group", 
+                                className={cn("w-full py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-lg md:text-xl flex items-center gap-3 justify-center transition-all shadow-2xl relative overflow-hidden group uppercase tracking-widest", 
                                     (teamA.players.length === 11 && teamB.players.length === 11) 
                                     ? "bg-white text-black hover:scale-[1.02] active:scale-[0.98] shadow-white/10" 
                                     : "bg-neutral-800 text-neutral-500 cursor-not-allowed")}
@@ -3723,27 +3781,44 @@ export default function CricketPage() {
                 {
                     showMatchResultModal && (
                         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md animate-in fade-in zoom-in duration-300">
-                            <div className="bg-[#1a1a1a] border border-[#333] rounded-2xl w-full max-w-sm p-6 text-center shadow-2xl relative overflow-hidden">
-                                {/* Confetti Effect (Simple CSS or just visual) */}
-                                <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+                            <div className="bg-[#1a1a1a] border border-[#333] rounded-3xl w-full max-w-[450px] p-6 text-center shadow-2xl relative overflow-y-auto max-h-[95vh] flex flex-col items-center">
+                                <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight">Match Finished!</h2>
+                                <p className="text-sm text-blue-400 font-bold mb-6">{matchResultText}</p>
 
-                                <div className="mb-4 flex justify-center">
-                                    <div className="p-3 bg-yellow-500/20 rounded-full animate-bounce">
-                                        <span className="text-4xl">🏆</span>
-                                    </div>
+                                {/* The Shareable Card */}
+                                <div className="mb-6 transform scale-90 sm:scale-100 origin-top">
+                                    <MatchSummaryCard
+                                        ref={summaryCardRef}
+                                        winnerTeam={matchResultText.includes(teamA.name) ? teamA.name : (matchResultText.includes(teamB.name) ? teamB.name : "Draw")}
+                                        teamA={{
+                                            name: teamA.name,
+                                            score: `${teamAScoreState.runs}/${teamAScoreState.wickets}`,
+                                            overs: `${Math.floor(teamAScoreState.balls / 6)}.${teamAScoreState.balls % 6}`
+                                        }}
+                                        teamB={{
+                                            name: teamB.name,
+                                            score: `${teamBScoreState.runs ? teamBScoreState.runs : totalRuns}/${teamBScoreState.wickets ? teamBScoreState.wickets : totalWickets}`,
+                                            overs: teamBScoreState.balls ? `${Math.floor(teamBScoreState.balls / 6)}.${teamBScoreState.balls % 6}` : `${Math.floor(totalBalls / 6)}.${totalBalls % 6}`
+                                        }}
+                                        result={matchResultText}
+                                        date={new Date().toLocaleDateString()}
+                                    />
                                 </div>
 
-                                <h2 className="text-2xl font-black text-white mb-2">Match Finished!</h2>
-                                <p className="text-lg text-blue-400 font-bold mb-6">{matchResultText}</p>
-
-                                <div className="space-y-3">
+                                <div className="space-y-3 w-full">
+                                    <button
+                                        onClick={handleDownloadSummary}
+                                        className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"
+                                    >
+                                        <Download size={18} /> Download & Share
+                                    </button>
                                     <button
                                         onClick={() => {
                                             saveMatch();
                                             setShowMatchResultModal(false);
                                             setGameState("setup");
                                         }}
-                                        className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-green-500/20"
+                                        className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-all shadow-lg"
                                     >
                                         Save & Exit
                                     </button>
