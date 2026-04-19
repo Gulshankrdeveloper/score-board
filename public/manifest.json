@@ -2,7 +2,7 @@
   "name": "SportsBoard",
   "short_name": "SportsBoard",
   "description": "Track scores for local multiplayer games in real-time.",
-  "start_url": "/cricket",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#3b82f6",
