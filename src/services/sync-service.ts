@@ -34,6 +34,7 @@ export interface SyncMatchData {
     teamBScore?: { runs: number; wickets: number; balls: number };
     status: 'Live' | 'Completed';
     updatedAt: any;
+    pin?: string;
 }
 
 const MATCHES_COLLECTION = "live_matches";

@@ -93,6 +93,29 @@ export default function Home() {
                     </Link>
                 ))}
             </div>
+
+            {/* Quick Join Match */}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="z-10 mt-16 w-full max-w-xl"
+            >
+                <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 shadow-2xl">
+                    <div className="flex-1 text-center md:text-left">
+                        <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-1">Watch Live Match</h3>
+                        <p className="text-xs text-neutral-400 font-bold uppercase tracking-widest">Enter a match PIN to join instantly</p>
+                    </div>
+                    <div className="flex w-full md:w-auto gap-2">
+                        <Link 
+                            href="/cricket?join=prompt"
+                            className="flex-1 md:flex-none px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95 text-center"
+                        >
+                            JOIN NOW
+                        </Link>
+                    </div>
+                </div>
+            </motion.div>
         </main>
     );
 }

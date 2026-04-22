@@ -15,6 +15,7 @@ import { toPng } from 'html-to-image';
 import { useRef } from "react";
 import { Share2, Download, Volume2, VolumeX, Cloud, CloudOff, Globe, Star } from "lucide-react";
 import { syncMatchToCloud, subscribeToMatchSync, subscribeToLiveMatches, SyncMatchData } from "@/services/sync-service";
+import { QRCodeCanvas } from "qrcode.react";
 
 // --- Types ---
 type Player = {
@@ -33,6 +34,7 @@ type Player = {
         runsConceded: number;
     };
     photoUrl?: string; // New: Player Photo
+    dismissalInfo?: string;
 };
 
 type Team = {
@@ -161,6 +163,32 @@ import PartnershipCard from "@/components/PartnershipCard";
 import WormGraph from "@/components/WormGraph";
 
 
+const calculateMVP = (teamA: Team, teamB: Team) => {
+    const allPlayers = [...teamA.players, ...teamB.players];
+    let mvp = allPlayers[0];
+    let maxPoints = -1;
+
+    allPlayers.forEach(p => {
+        let points = 0;
+        points += p.runs;
+        points += (p.fours * 1) + (p.sixes * 2);
+        points += p.bowling.wickets * 25;
+        points += p.bowling.maidens * 10;
+        
+        if (p.bowling.overs > 0) {
+            const econ = p.bowling.runsConceded / p.bowling.overs;
+            if (econ > 10) points -= 5;
+        }
+
+        if (points > maxPoints && (p.runs > 0 || p.bowling.wickets > 0)) {
+            maxPoints = points;
+            mvp = p;
+        }
+    });
+
+    return mvp && maxPoints >= 0 ? { name: mvp.name, runs: mvp.runs, wickets: mvp.bowling.wickets } : undefined;
+};
+
 export default function CricketPage() {
     // --- Game Config State ---
     const [gameState, setGameState] = useState<GameState>("setup");
@@ -169,6 +197,9 @@ export default function CricketPage() {
     const [userRole, setUserRole] = useState<UserRole>(null);
     const [showLoginModal, setShowLoginModal] = useState(false);
     const [viewMode, setViewMode] = useState<ViewMode>("dashboard");
+    const [matchPin, setMatchPin] = useState<string>("");
+    const [showShareModal, setShowShareModal] = useState<boolean>(false);
+    const [joinPinInput, setJoinPinInput] = useState<string>("");
 
     const handleRoleSelect = (role: UserRole) => {
         if (role === 'scorer') {
@@ -396,6 +427,26 @@ export default function CricketPage() {
             if (savedActiveMatchId) setActiveTournamentMatchId(savedActiveMatchId);
         } catch (e) { console.error("Active match parse error", e); }
     }, []);
+    
+    // URL Parameter Joining Logic
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            const joinId = params.get('join') || params.get('match');
+            
+            if (joinId) {
+                if (joinId === 'prompt') {
+                    // Just clear the URL and stay on dashboard
+                    window.history.replaceState({}, '', window.location.pathname);
+                } else if (userRole === null) {
+                    setActiveTournamentMatchId(joinId);
+                    setGameState("playing");
+                    setUserRole('viewer');
+                    window.history.replaceState({}, '', window.location.pathname);
+                }
+            }
+        }
+    }, [userRole]);
 
     useEffect(() => {
         localStorage.setItem('cricket_history', JSON.stringify(matchHistory));
@@ -467,7 +518,8 @@ export default function CricketPage() {
                 targetRuns,
                 teamAScore: battingTeam === 'A' ? { runs: totalRuns, wickets: totalWickets, balls: totalBalls } : teamAScoreState,
                 teamBScore: battingTeam === 'B' ? { runs: totalRuns, wickets: totalWickets, balls: totalBalls } : teamBScoreState,
-                status: 'Live'
+                status: 'Live',
+                pin: matchPin
             };
 
             const timer = setTimeout(() => {
@@ -658,6 +710,7 @@ export default function CricketPage() {
     };
 
     const handleToss = (winner: "A" | "B", choice: "bat" | "bowl") => {
+        setMatchPin(Math.floor(100000 + Math.random() * 900000).toString());
         let newBattingTeam: "A" | "B" = "A";
         if (winner === "A") {
             newBattingTeam = choice === "bat" ? "A" : "B";
@@ -868,6 +921,7 @@ export default function CricketPage() {
     };
 
     const startTournamentMatch = (matchId: string) => {
+        setMatchPin(Math.floor(100000 + Math.random() * 900000).toString());
         const match = tournamentMatches.find(m => m.id === matchId);
         if (!match) return;
 
@@ -1037,12 +1091,12 @@ export default function CricketPage() {
         localStorage.setItem('cricket_history', JSON.stringify(updatedHistory));
     };
 
-    const markStrikerOut = () => {
+    const markStrikerOut = (dismissalInfo?: string) => {
         if (!strikerId) return;
         const teamSetter = battingTeam === "A" ? setTeamA : setTeamB;
         teamSetter(prev => ({
             ...prev,
-            players: prev.players.map(p => p.id === strikerId ? { ...p, out: true } : p)
+            players: prev.players.map(p => p.id === strikerId ? { ...p, out: true, dismissalInfo: dismissalInfo || "out" } : p)
         }));
     };
 
@@ -1210,10 +1264,11 @@ export default function CricketPage() {
                     setCelebration("W");
                     // If runs is "W" and we passed the type in shotCoordinates (hijacked)
                     const wicketMethod = (runs === "W" && typeof shotCoordinates === 'string') ? shotCoordinates : "Out";
+                    const dismissalDesc = wicketMethod === "Bowled" ? `b ${bowler?.name || 'Bowler'}` : wicketMethod === "Caught" ? `c Fielder b ${bowler?.name || 'Bowler'}` : wicketMethod === "LBW" ? `lbw b ${bowler?.name || 'Bowler'}` : wicketMethod === "Run Out" ? `run out` : wicketMethod;
                     speak(hindiMode ? `${wicketMethod}! Zabardast wicket!` : `${wicketMethod}! What a delivery!`);
                     setTotalWickets(w => w + 1);
                     updateBatsmanScore(0);
-                    markStrikerOut();
+                    markStrikerOut(dismissalDesc);
                     updateBowlerStats(0, true, true);
 
                     if (totalWickets + 1 >= 10) {
@@ -1604,6 +1659,47 @@ export default function CricketPage() {
                                             ))}
                                         </div>
                                     )}
+
+                                    {/* Join by PIN - Community/Global Section */}
+                                    <div className="mt-8 pt-8 border-t border-neutral-800">
+                                        <div className="bg-gradient-to-br from-blue-600/10 to-indigo-600/10 border border-blue-500/20 rounded-2xl p-6">
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center text-blue-400">
+                                                    <Target size={20} />
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-bold text-white text-sm">Join Match by PIN</h3>
+                                                    <p className="text-[10px] text-neutral-500">Enter the 6-digit PIN shared by the scorer</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    maxLength={6}
+                                                    placeholder="Enter 6-digit PIN"
+                                                    className="flex-1 bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2 text-sm text-center font-mono tracking-widest focus:outline-none focus:border-blue-500 transition-colors"
+                                                    value={joinPinInput}
+                                                    onChange={(e) => setJoinPinInput(e.target.value.replace(/\D/g, ''))}
+                                                />
+                                                <button 
+                                                    onClick={() => {
+                                                        const match = communityMatches.find(m => m.pin === joinPinInput);
+                                                        if (match) {
+                                                            setActiveTournamentMatchId(match.id);
+                                                            setGameState("playing");
+                                                            setUserRole('viewer');
+                                                            setJoinPinInput("");
+                                                        } else {
+                                                            alert("Invalid PIN or Match not live.");
+                                                        }
+                                                    }}
+                                                    className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-all active:scale-95"
+                                                >
+                                                    JOIN
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </>
                             )}
 
@@ -2949,7 +3045,12 @@ export default function CricketPage() {
                                     <tbody className="divide-y divide-neutral-800">
                                         {selectedMatch.teamA.players.filter(p => p.balls > 0 || p.out).map(p => (
                                             <tr key={p.id} className="hover:bg-neutral-800/50">
-                                                <td className="p-3 font-medium">{p.name} {p.out ? <span className="text-red-400 text-xs ml-1">(out)</span> : <span className="text-green-400 text-xs ml-1">*</span>}</td>
+                                                <td className="p-3 font-medium">
+                                                    <div className="text-white flex items-center gap-1">
+                                                        {p.name} {!p.out && <span className="text-green-400 text-xs">*</span>}
+                                                    </div>
+                                                    {p.out && <div className="text-[10px] text-neutral-500 uppercase tracking-tight mt-0.5">{p.dismissalInfo || 'out'}</div>}
+                                                </td>
                                                 <td className="p-3 text-right font-bold text-white">{p.runs}</td>
                                                 <td className="p-3 text-right text-neutral-400">{p.balls}</td>
                                                 <td className="p-3 text-right hidden md:table-cell text-neutral-500">{p.fours}</td>
@@ -3022,7 +3123,12 @@ export default function CricketPage() {
                                     <tbody className="divide-y divide-neutral-800">
                                         {selectedMatch.teamB.players.filter(p => p.balls > 0 || p.out).map(p => (
                                             <tr key={p.id} className="hover:bg-neutral-800/50">
-                                                <td className="p-3 font-medium">{p.name} {p.out ? <span className="text-red-400 text-xs ml-1">(out)</span> : <span className="text-green-400 text-xs ml-1">*</span>}</td>
+                                                <td className="p-3 font-medium">
+                                                    <div className="text-white flex items-center gap-1">
+                                                        {p.name} {!p.out && <span className="text-green-400 text-xs">*</span>}
+                                                    </div>
+                                                    {p.out && <div className="text-[10px] text-neutral-500 uppercase tracking-tight mt-0.5">{p.dismissalInfo || 'out'}</div>}
+                                                </td>
                                                 <td className="p-3 text-right font-bold text-white">{p.runs}</td>
                                                 <td className="p-3 text-right text-neutral-400">{p.balls}</td>
                                                 <td className="p-3 text-right hidden md:table-cell text-neutral-500">{p.fours}</td>
@@ -3348,13 +3454,9 @@ export default function CricketPage() {
                         )}
                         {isCloudSyncEnabled && userRole === 'scorer' && (
                             <button
-                                onClick={() => {
-                                    const matchId = activeTournamentMatchId || "local-match-" + teamAName.replace(/\s+/g, '-') + "-" + teamBName.replace(/\s+/g, '-');
-                                    navigator.clipboard.writeText(matchId);
-                                    alert(`Match ID copied: ${matchId}`);
-                                }}
+                                onClick={() => setShowShareModal(true)}
                                 className="p-1.5 rounded-md hover:bg-neutral-700 text-blue-400 transition-colors"
-                                title="Copy Match ID"
+                                title="Share Live Match"
                             >
                                 <Share2 size={14} />
                             </button>
@@ -3474,67 +3576,84 @@ export default function CricketPage() {
                                     <div className="w-8 text-right hidden sm:block">6s</div>
                                     <div className="w-10 text-right">SR</div>
                                 </div>
-                                {/* Striker */}
-                                <div
-                                    onClick={() => !strikerId && console.log("Trigger Select")}
-                                    className={cn("flex px-3 py-3 border-b border-[#222] items-center relative gap-3", strikerId ? "" : "animate-pulse bg-red-900/10")}
-                                >
-                                    {strikerId && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div>}
+                                
+                                {currentBattingTeam.players.filter(p => p.balls > 0 || p.out || p.id === strikerId || p.id === nonStrikerId).map(p => {
+                                    const isStriker = p.id === strikerId;
+                                    const isNonStriker = p.id === nonStrikerId;
+                                    const isActive = isStriker || isNonStriker;
 
-                                    {/* Player Photo */}
-                                    <div className="w-10 h-10 rounded-full bg-neutral-800 overflow-hidden flex-shrink-0 flex items-center justify-center border border-neutral-700">
-                                        {striker?.photoUrl ? (
-                                            <img src={striker.photoUrl} alt={striker.name} className="w-full h-full object-cover" />
-                                        ) : (
-                                            <User size={20} className="text-neutral-500" />
-                                        )}
-                                    </div>
+                                    return (
+                                        <div
+                                            key={p.id}
+                                            className={cn(
+                                                "flex px-3 py-2.5 border-b border-[#222] items-center relative gap-3 translate-all duration-300",
+                                                isActive ? "bg-blue-500/5" : "opacity-75"
+                                            )}
+                                        >
+                                            {isStriker && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div>}
+                                            
+                                            {/* Player Photo */}
+                                            <div className="w-8 h-8 rounded-full bg-neutral-800 overflow-hidden flex-shrink-0 flex items-center justify-center border border-neutral-700">
+                                                {p.photoUrl ? (
+                                                    <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <User size={14} className="text-neutral-500" />
+                                                )}
+                                            </div>
 
-                                    <div className="flex-1 flex flex-col justify-center">
-                                        <div className="flex items-center gap-2 text-white font-bold text-sm">
-                                            {striker?.name || <span className="text-red-400 italic font-normal">Select Striker</span>}
-                                            <span className="text-blue-500 text-xs">★</span>
+                                            <div className="flex-1 flex flex-col justify-center min-w-0">
+                                                <div className="flex items-center gap-1.5 text-white font-bold text-xs truncate">
+                                                    {p.name}
+                                                    {isStriker && <span className="text-blue-500 text-[10px]">★</span>}
+                                                </div>
+                                                {p.out && (
+                                                    <div className="text-[10px] text-neutral-500 truncate uppercase tracking-tighter">
+                                                        {p.dismissalInfo || 'out'}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="w-8 text-right font-bold text-white text-xs">{p.runs}</div>
+                                            <div className="w-8 text-right text-neutral-400 text-[10px]">{p.balls}</div>
+                                            <div className="w-8 text-right text-neutral-500 text-[10px] hidden sm:block">{p.fours}</div>
+                                            <div className="w-8 text-right text-neutral-500 text-[10px] hidden sm:block">{p.sixes}</div>
+                                            <div className="w-10 text-right text-neutral-400 text-[10px] font-mono">
+                                                {p.balls > 0 ? ((p.runs / p.balls) * 100).toFixed(0) : "0"}
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="w-8 text-right font-bold text-white text-sm">{striker?.runs ?? 0}</div>
-                                    <div className="w-8 text-right text-neutral-400 text-xs">{striker?.balls ?? 0}</div>
-                                    <div className="w-8 text-right text-neutral-500 text-xs hidden sm:block">{striker?.fours ?? 0}</div>
-                                    <div className="w-8 text-right text-neutral-500 text-xs hidden sm:block">{striker?.sixes ?? 0}</div>
-                                    <div className="w-10 text-right text-neutral-400 text-xs">{striker?.balls ? ((striker.runs / striker.balls) * 100).toFixed(0) : "0"}</div>
-                                </div>
+                                    );
+                                })}
 
-                                {/* Non Striker */}
-                                <div
-                                    onClick={() => !nonStrikerId && console.log("Trigger Select")}
-                                    className={cn("flex px-3 py-3 border-b border-[#222] items-center gap-3", nonStrikerId ? "" : "animate-pulse bg-red-900/10")}
-                                >
-                                    {/* Player Photo */}
-                                    <div className="w-10 h-10 rounded-full bg-neutral-800 overflow-hidden flex-shrink-0 flex items-center justify-center border border-neutral-700">
-                                        {nonStriker?.photoUrl ? (
-                                            <img src={nonStriker.photoUrl} alt={nonStriker.name} className="w-full h-full object-cover" />
-                                        ) : (
-                                            <User size={20} className="text-neutral-500" />
-                                        )}
+                                {currentBattingTeam.players.filter(p => !p.balls && !p.out && p.id !== strikerId && p.id !== nonStrikerId).length > 0 && (
+                                    <div className="px-3 py-2 bg-black/20 text-[9px] font-bold text-neutral-600 uppercase tracking-widest border-b border-[#222]">
+                                        Yet to bat
                                     </div>
-
-                                    <div className="flex-1 flex flex-col justify-center">
-                                        <div className="flex items-center gap-2 text-white font-semibold text-sm">
-                                            {nonStriker?.name || <span className="text-red-400 italic font-normal">Select Non-Striker</span>}
-                                        </div>
-                                    </div>
-                                    <div className="w-8 text-right font-bold text-white text-sm">{nonStriker?.runs ?? 0}</div>
-                                    <div className="w-8 text-right text-neutral-400 text-xs">{nonStriker?.balls ?? 0}</div>
-                                    <div className="w-8 text-right text-neutral-500 text-xs hidden sm:block">{nonStriker?.fours ?? 0}</div>
-                                    <div className="w-8 text-right text-neutral-500 text-xs hidden sm:block">{nonStriker?.sixes ?? 0}</div>
-                                    <div className="w-10 text-right text-neutral-400 text-xs">{nonStriker?.balls ? ((nonStriker.runs / nonStriker.balls) * 100).toFixed(0) : "0"}</div>
-                                </div>
-
-                                {/* Swap Button (Admin) */}
-                                {isAdmin && strikerId && nonStrikerId && (
-                                    <button onClick={swapStriker} className="w-full py-2 flex items-center justify-center gap-1 text-[#666] hover:text-white bg-[#222] hover:bg-[#333] transition-colors text-xs border-b border-[#333]">
-                                        <ArrowLeftRight size={12} /> Swap Ends
-                                    </button>
                                 )}
+                                
+                                <div className="p-2 gap-2 flex overflow-x-auto bg-black/10">
+                                    {currentBattingTeam.players.filter(p => !p.balls && !p.out && p.id !== strikerId && p.id !== nonStrikerId).map(p => (
+                                        <div key={p.id} className="px-2 py-1 bg-neutral-800/50 rounded border border-neutral-700 text-[10px] text-neutral-400 whitespace-nowrap">
+                                            {p.name}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Fall of Wickets Summary */}
+                            <div className="bg-[#1a1a1a] mb-1 px-3 py-3 border-b border-[#222]">
+                                <div className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2">Fall of Wickets</div>
+                                <div className="flex flex-wrap gap-2">
+                                    {commentary.filter(c => c.isWicket).reverse().map((w, i) => {
+                                        // Try to extract FOW score from text if possible, or just index
+                                        return (
+                                            <div key={w.id} className="text-[10px] text-neutral-400 bg-red-500/5 border border-red-500/10 px-2 py-1 rounded">
+                                                <span className="text-red-400 font-bold">{i+1}-{w.over.split('.')[0]}</span> ({w.text.split(',')[0].split(' ').pop()})
+                                            </div>
+                                        );
+                                    })}
+                                    {commentary.filter(c => c.isWicket).length === 0 && (
+                                        <div className="text-[10px] text-neutral-600 italic">No wickets fallen yet.</div>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Partnership Card */}
@@ -3802,6 +3921,7 @@ export default function CricketPage() {
                                         }}
                                         result={matchResultText}
                                         date={new Date().toLocaleDateString()}
+                                        manOfTheMatch={calculateMVP(teamA, teamB)}
                                     />
                                 </div>
 
@@ -3901,6 +4021,84 @@ export default function CricketPage() {
                             </div>
                         </motion.div>
                     </div>
+                )}
+            </AnimatePresence>
+
+            {/* Share Live Modal */}
+            <AnimatePresence>
+                {showShareModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            className="bg-neutral-950 border border-neutral-800 rounded-[2.5rem] w-full max-w-sm overflow-hidden flex flex-col relative"
+                        >
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full blur-[80px] -mr-32 -mt-32 pointer-events-none"></div>
+                            
+                            <div className="p-6 text-center space-y-6 relative z-10">
+                                <div className="flex justify-between items-center text-left">
+                                    <div>
+                                        <h3 className="text-xl font-black text-white uppercase tracking-tighter">Share Live Match</h3>
+                                        <p className="text-xs text-neutral-500 font-bold uppercase tracking-widest mt-1">Match PIN Security</p>
+                                    </div>
+                                    <button onClick={() => setShowShareModal(false)} className="p-3 bg-neutral-900 rounded-2xl hover:bg-neutral-800 transition-colors">
+                                        <X size={20} className="text-neutral-400" />
+                                    </button>
+                                </div>
+
+                                <div className="bg-white p-6 rounded-[2rem] inline-block shadow-2xl shadow-blue-500/10">
+                                    <QRCodeCanvas 
+                                        value={`${typeof window !== 'undefined' ? window.location.origin : ''}/cricket?join=${activeTournamentMatchId || ''}`}
+                                        size={200}
+                                        level="H"
+                                        includeMargin={false}
+                                    />
+                                </div>
+
+                                <div className="space-y-4 pt-2">
+                                    <div className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-4 flex flex-col items-center gap-1">
+                                        <div className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">Match PIN</div>
+                                        <div className="text-4xl font-black text-white tracking-widest font-mono">
+                                            {matchPin || "------"}
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button 
+                                            onClick={() => {
+                                                const url = `${window.location.origin}/cricket?join=${activeTournamentMatchId || ''}`;
+                                                navigator.clipboard.writeText(url);
+                                                alert("Link copied!");
+                                            }}
+                                            className="flex flex-col items-center justify-center gap-2 py-4 bg-neutral-900 border border-neutral-800 rounded-3xl hover:bg-neutral-800 transition-all active:scale-95 group"
+                                        >
+                                            <Share2 size={24} className="text-blue-500 group-hover:scale-110 transition-transform" />
+                                            <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Copy Link</span>
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(matchPin);
+                                                alert("PIN copied!");
+                                            }}
+                                            className="flex flex-col items-center justify-center gap-2 py-4 bg-neutral-900 border border-neutral-800 rounded-3xl hover:bg-neutral-800 transition-all active:scale-95 group"
+                                        >
+                                            <Target size={24} className="text-emerald-500 group-hover:scale-110 transition-transform" />
+                                            <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Copy PIN</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <p className="text-[10px] text-neutral-600 font-bold leading-relaxed px-4">
+                                    Viewers can join by scanning the QR code or entering the PIN on the app dashboard.
+                                </p>
+                            </div>
+                        </motion.div>
+                    </AnimatePresence>
                 )}
             </AnimatePresence>
         </div >
